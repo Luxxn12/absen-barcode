@@ -10,13 +10,15 @@ import {
   Users,
   BookOpen,
   Home,
+  ListChecks,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/guru/dashboard", label: "Dashboard", icon: Home },
+  { href: "/guru/status", label: "Status Harian", icon: ListChecks },
   { href: "/guru/siswa", label: "Data Siswa", icon: Users },
   { href: "/guru/barcode", label: "QR Siswa", icon: QrCode },
   { href: "/guru/rekap", label: "Rekap Bulanan", icon: BarChart3 },
@@ -25,6 +27,7 @@ const navItems = [
 
 const mobileNav = [
   { href: "/guru/dashboard", label: "Home", icon: Home },
+  { href: "/guru/status", label: "Status", icon: ListChecks },
   { href: "/guru/siswa", label: "Siswa", icon: Users },
   { href: "/guru/barcode", label: "QR", icon: QrCode },
   { href: "/guru/rekap", label: "Rekap", icon: BarChart3 },
@@ -50,7 +53,7 @@ export default function GuruLayout({
   }, [hydrated, session, router]);
 
   useEffect(() => {
-    setIsProfileMenuOpen(false);
+    startTransition(() => setIsProfileMenuOpen(false));
   }, [pathname]);
 
   useEffect(() => {
@@ -89,8 +92,8 @@ export default function GuruLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100 text-slate-800">
-      <aside className="hidden w-72 flex-col border-r border-slate-200 bg-white px-6 py-8 md:flex">
+    <div className="flex h-screen overflow-hidden bg-slate-100 text-slate-800">
+      <aside className="hidden h-full w-72 flex-col overflow-y-auto border-r border-slate-200 bg-white px-6 py-8 md:flex">
         <div className="mb-10 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-lg font-semibold text-indigo-600">
             AB
@@ -145,7 +148,7 @@ export default function GuruLayout({
         </div>
       </aside>
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex h-full flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/85 px-4 py-3 backdrop-blur md:px-8">
           <div>
             <p className="text-xs uppercase tracking-widest text-indigo-500">
@@ -194,7 +197,9 @@ export default function GuruLayout({
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
+        <main className="flex-1 overflow-y-auto px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-8">
+          {children}
+        </main>
       </div>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-slate-200 bg-white/95 px-4 py-2 backdrop-blur md:hidden">

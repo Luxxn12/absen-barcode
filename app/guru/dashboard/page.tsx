@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useMemo } from "react";
 import {
   Activity,
   CalendarDays,
@@ -9,31 +10,128 @@ import {
   Users,
 } from "lucide-react";
 import { useStudents } from "@/contexts/StudentContext";
+import {
+  AttendanceStatus,
+  useAttendance,
+} from "@/contexts/AttendanceContext";
 import { cn } from "@/lib/utils";
 
-const statusColors: Record<string, string> = {
+const statusColors: Record<
+  AttendanceStatus | "Belum Absen",
+  string
+> = {
   Hadir: "bg-emerald-100 text-emerald-600",
   Sakit: "bg-amber-100 text-amber-600",
   Izin: "bg-blue-100 text-blue-600",
   Alfa: "bg-rose-100 text-rose-600",
+  "Belum Absen": "bg-slate-100 text-slate-600",
 };
 
 export default function GuruDashboardPage() {
   const { students } = useStudents();
+  const { getRecordsByDate } = useAttendance();
+
+  const todayKey = useMemo(() => {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return local.toISOString().split("T")[0];
+  }, []);
+
+  const todayRecords = useMemo(
+    () => getRecordsByDate(todayKey),
+    [getRecordsByDate, todayKey]
+  );
+
+  const recordMap = useMemo(() => {
+    const map = new Map<string, { status: AttendanceStatus; checkIn: string }>();
+    todayRecords.forEach((record) => {
+      map.set(record.studentId, {
+        status: record.status,
+        checkIn: record.checkIn,
+      });
+    });
+    return map;
+  }, [todayRecords]);
 
   const totalStudents = students.length;
-  const hadir = students.filter((student) => student.lastStatus === "Hadir");
-  const sakit = students.filter((student) => student.lastStatus === "Sakit");
-  const izin = students.filter((student) => student.lastStatus === "Izin");
-  const alfa = students.filter((student) => student.lastStatus === "Alfa");
+  const hadirCount = todayRecords.filter((record) => record.status === "Hadir").length;
+  const sakitCount = todayRecords.filter((record) => record.status === "Sakit").length;
+  const izinCount = todayRecords.filter((record) => record.status === "Izin").length;
+  const alfaCount = todayRecords.filter((record) => record.status === "Alfa").length;
+  const unrecordedCount = students.reduce(
+    (total, student) => total + (recordMap.has(student.id) ? 0 : 1),
+    0
+  );
+  const tanpaKeteranganCount = alfaCount + unrecordedCount;
 
-  const today = new Date().toLocaleDateString("id-ID", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const today = useMemo(
+    () =>
+      new Date().toLocaleDateString("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }),
+    []
+  );
 
-  const miniTable = students.slice(0, 6);
+  const miniTable = useMemo(
+    () =>
+      students.slice(0, 6).map((student) => {
+        const record = recordMap.get(student.id);
+        return {
+          ...student,
+          status: record?.status ?? ("Belum Absen" as const),
+          checkIn: record?.checkIn ?? "-",
+        };
+      }),
+    [students, recordMap]
+  );
+
+  const exportCsv = useCallback(() => {
+    const rows = students.map((student) => {
+      const record = recordMap.get(student.id);
+      return {
+        id: student.id,
+        name: student.name,
+        className: student.className,
+        status: record?.status ?? "Belum Absen",
+        checkIn:
+          record?.checkIn && record.checkIn !== "-"
+            ? `${record.checkIn} WIB`
+            : "-",
+      };
+    });
+    if (!rows.length) return;
+    const headers = ["ID", "Nama", "Kelas", "Status", "Jam Masuk"];
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) =>
+        [
+          row.id,
+          `"${row.name.replace(/"/g, '""')}"`,
+          `"${row.className.replace(/"/g, '""')}"`,
+          row.status,
+          row.checkIn,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([`\ufeff${csvContent}`], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const todayLabel = new Date()
+      .toISOString()
+      .split("T")[0]
+      .replace(/-/g, "");
+    link.download = `rekap-harian-${todayLabel}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [students, recordMap]);
 
   return (
     <div className="space-y-8">
@@ -46,19 +144,19 @@ export default function GuruDashboardPage() {
         />
         <SummaryCard
           title="Hadir Hari Ini"
-          value={`${hadir.length} siswa`}
+          value={`${hadirCount} siswa`}
           icon={CheckCircle2}
           accent="from-emerald-500 to-lime-500"
         />
         <SummaryCard
           title="Sakit / Izin"
-          value={`${sakit.length + izin.length} siswa`}
+          value={`${sakitCount + izinCount} siswa`}
           icon={Activity}
           accent="from-amber-500 to-orange-500"
         />
         <SummaryCard
           title="Tanpa Keterangan"
-          value={`${alfa.length} siswa`}
+          value={`${tanpaKeteranganCount} siswa`}
           icon={Clock}
           accent="from-rose-500 to-pink-500"
         />
@@ -75,7 +173,10 @@ export default function GuruDashboardPage() {
                 Kehadiran per siswa ({today})
               </h2>
             </div>
-            <button className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700">
+            <button
+              onClick={exportCsv}
+              className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700"
+            >
               <CalendarDays className="h-4 w-4" />
               Export CSV
             </button>
@@ -89,38 +190,35 @@ export default function GuruDashboardPage() {
               <span>Jam Masuk</span>
             </div>
             <div className="divide-y divide-slate-100">
-              {miniTable.map((student) => (
+              {miniTable.map((row) => (
                 <div
-                  key={student.id}
+                  key={row.id}
                   className="grid grid-cols-1 gap-y-1 px-4 py-4 text-sm sm:grid-cols-4 sm:items-center sm:gap-3"
                 >
                   <div>
                     <p className="font-semibold text-slate-900">
-                      {student.name}
+                      {row.name}
                     </p>
                     <p className="text-xs text-slate-400 sm:hidden">
-                      {student.className}
+                      {row.className}
                     </p>
                   </div>
                   <div className="text-slate-500 max-sm:hidden">
-                    {student.className}
+                    {row.className}
                   </div>
                   <div>
                     <span
                       className={cn(
                         "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold",
-                        statusColors[student.lastStatus] ??
-                          "bg-slate-100 text-slate-600"
+                        statusColors[row.status] ?? "bg-slate-100 text-slate-600"
                       )}
                     >
                       <span className="h-2 w-2 rounded-full bg-current" />
-                      {student.lastStatus}
+                      {row.status}
                     </span>
                   </div>
                   <div className="text-slate-500">
-                    {student.lastCheckIn === "—"
-                      ? "Belum tercatat"
-                      : `${student.lastCheckIn} WIB`}
+                    {row.checkIn === "-" ? "Belum tercatat" : `${row.checkIn} WIB`}
                   </div>
                 </div>
               ))}

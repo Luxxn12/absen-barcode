@@ -1,28 +1,43 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Plus, Search, Trash2, Pencil, QrCode, X } from "lucide-react";
 import {
-  AttendanceStatus,
-  Student,
-  useStudents,
-} from "@/contexts/StudentContext";
-import { cn } from "@/lib/utils";
-
-const statusOptions: AttendanceStatus[] = ["Hadir", "Sakit", "Izin", "Alfa"];
+  Plus,
+  Search,
+  Trash2,
+  Pencil,
+  QrCode,
+  X,
+  Settings2,
+} from "lucide-react";
+import { Student, useStudents } from "@/contexts/StudentContext";
 
 export default function GuruSiswaPage() {
-  const { students, addStudent, updateStudent, removeStudent } = useStudents();
+  const {
+    students,
+    classes,
+    addStudent,
+    updateStudent,
+    removeStudent,
+    addClass,
+    updateClass,
+    removeClass,
+  } = useStudents();
   const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
   const [formState, setFormState] = useState({
     name: "",
-    className: "",
-    lastStatus: "Hadir" as AttendanceStatus,
-    lastCheckIn: "07:00",
+    classId: "",
   });
+  const [page, setPage] = useState(1);
+  const [isClassManagerOpen, setIsClassManagerOpen] = useState(false);
+  const [newClassName, setNewClassName] = useState("");
+  const [classDrafts, setClassDrafts] = useState<Record<string, string>>({});
+  const [classError, setClassError] = useState("");
+
+  const ITEMS_PER_PAGE = 10;
 
   const filteredStudents = useMemo(() => {
     if (!search.trim()) return students;
@@ -34,43 +49,61 @@ export default function GuruSiswaPage() {
     );
   }, [students, search]);
 
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredStudents.length / ITEMS_PER_PAGE)
+  );
+
+  const safePage = Math.min(page, totalPages);
+
+  const paginatedStudents = useMemo(() => {
+    const start = (safePage - 1) * ITEMS_PER_PAGE;
+    return filteredStudents.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredStudents, safePage]);
+
+  const startItem =
+    paginatedStudents.length === 0
+      ? 0
+      : (safePage - 1) * ITEMS_PER_PAGE + 1;
+  const endItem = (safePage - 1) * ITEMS_PER_PAGE + paginatedStudents.length;
+  const totalFiltered = filteredStudents.length;
+
   const openAddModal = () => {
     setEditingStudent(null);
     setFormState({
       name: "",
-      className: "",
-      lastStatus: "Hadir",
-      lastCheckIn: "07:00",
+      classId: classes[0]?.id ?? "",
     });
     setIsFormOpen(true);
   };
 
   const openEditModal = (student: Student) => {
     setEditingStudent(student);
+    const existingClass =
+      classes.find((classItem) => classItem.name === student.className) ??
+      addClass(student.className);
     setFormState({
       name: student.name,
-      className: student.className,
-      lastStatus: student.lastStatus,
-      lastCheckIn: student.lastCheckIn,
+      classId: existingClass?.id ?? "",
     });
     setIsFormOpen(true);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const selectedClass = classes.find(
+      (classItem) => classItem.id === formState.classId
+    );
+    if (!selectedClass) return;
     if (editingStudent) {
       updateStudent(editingStudent.id, {
         name: formState.name,
-        className: formState.className,
-        lastStatus: formState.lastStatus,
-        lastCheckIn: formState.lastCheckIn,
+        className: selectedClass.name,
       });
     } else {
       addStudent({
         name: formState.name,
-        className: formState.className,
-        lastStatus: formState.lastStatus,
-        lastCheckIn: formState.lastCheckIn,
+        className: selectedClass.name,
       });
     }
     setIsFormOpen(false);
@@ -88,13 +121,32 @@ export default function GuruSiswaPage() {
               Kelola data siswa & barcode
             </h2>
           </div>
-          <button
-            onClick={openAddModal}
-            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700"
-          >
-            <Plus className="h-4 w-4" />
-            Tambah Siswa
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              onClick={() => {
+                setClassDrafts(
+                  classes.reduce<Record<string, string>>((acc, item) => {
+                    acc[item.id] = item.name;
+                    return acc;
+                  }, {})
+                );
+                setNewClassName("");
+                setClassError("");
+                setIsClassManagerOpen(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-5 py-3 text-sm font-semibold text-indigo-600 shadow-md shadow-indigo-500/10 transition hover:border-indigo-200 hover:bg-indigo-100"
+            >
+              <Settings2 className="h-4 w-4" />
+              Kelola Kelas
+            </button>
+            <button
+              onClick={openAddModal}
+              className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700"
+            >
+              <Plus className="h-4 w-4" />
+              Tambah Siswa
+            </button>
+          </div>
         </header>
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -102,13 +154,16 @@ export default function GuruSiswaPage() {
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
               className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
               placeholder="Cari nama, kelas, atau ID barcode siswa"
             />
           </div>
           <p className="text-xs text-slate-400">
-            Total siswa terdaftar: <strong>{students.length}</strong>
+            Total siswa ditampilkan: <strong>{totalFiltered}</strong>
           </p>
         </div>
 
@@ -119,12 +174,11 @@ export default function GuruSiswaPage() {
                 <th className="px-6 py-3">Nama</th>
                 <th className="px-6 py-3">Kelas</th>
                 <th className="px-6 py-3">QR Code</th>
-                <th className="px-6 py-3">Status</th>
                 <th className="px-6 py-3">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {filteredStudents.map((student) => (
+              {paginatedStudents.map((student) => (
                 <tr key={student.id} className="transition hover:bg-slate-50/60">
                   <td className="px-6 py-4 font-semibold text-slate-900">
                     {student.name}
@@ -134,17 +188,6 @@ export default function GuruSiswaPage() {
                     <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500">
                       <QrCode className="h-4 w-4" />
                       {student.id}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold",
-                        statusBadge(student.lastStatus)
-                      )}
-                    >
-                      <span className="h-2 w-2 rounded-full bg-current" />
-                      {student.lastStatus}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -178,7 +221,7 @@ export default function GuruSiswaPage() {
         </div>
 
         <div className="space-y-4 lg:hidden">
-          {filteredStudents.map((student) => (
+          {paginatedStudents.map((student) => (
             <div
               key={student.id}
               className="relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-5 shadow-sm"
@@ -192,20 +235,6 @@ export default function GuruSiswaPage() {
                 </div>
                 <span className="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
                   {student.id}
-                </span>
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-full px-3 py-1 font-semibold",
-                    statusBadge(student.lastStatus)
-                  )}
-                >
-                  <span className="h-2 w-2 rounded-full bg-current" />
-                  {student.lastStatus}
-                </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-500">
-                  Jam {student.lastCheckIn === "—" ? "-" : student.lastCheckIn}
                 </span>
               </div>
               <div className="mt-5 flex items-center gap-3">
@@ -229,6 +258,38 @@ export default function GuruSiswaPage() {
               Tidak ada data siswa sesuai pencarian.
             </div>
           )}
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-3xl border border-slate-100 bg-white px-4 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Menampilkan{" "}
+            <strong className="text-slate-700">
+              {startItem === 0 ? 0 : `${startItem}-${endItem}`}
+            </strong>{" "}
+            dari{" "}
+            <strong className="text-slate-700">{totalFiltered}</strong> siswa
+          </p>
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs">
+            <button
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={safePage === 1 || totalFiltered === 0}
+              className="rounded-full border border-slate-200 px-3 py-2 font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Sebelumnya
+            </button>
+            <span className="font-semibold text-slate-700">
+              Halaman {safePage} dari {totalPages}
+            </span>
+            <button
+              onClick={() =>
+                setPage((prev) => Math.min(totalPages, prev + 1))
+              }
+              disabled={safePage === totalPages || totalFiltered === 0}
+              className="rounded-full border border-slate-200 px-3 py-2 font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Berikutnya
+            </button>
+          </div>
         </div>
       </section>
 
@@ -268,60 +329,50 @@ export default function GuruSiswaPage() {
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Kelas
+                <label className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  <span>Kelas</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClassDrafts(
+                        classes.reduce<Record<string, string>>((acc, item) => {
+                          acc[item.id] = item.name;
+                          return acc;
+                        }, {})
+                      );
+                      setNewClassName("");
+                      setClassError("");
+                      setIsClassManagerOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold text-indigo-600 transition hover:border-indigo-200 hover:bg-indigo-50"
+                  >
+                    <Settings2 className="h-3 w-3" />
+                    Kelola kelas
+                  </button>
                 </label>
-                <input
-                  value={formState.className}
+                <select
+                  value={formState.classId}
                   onChange={(event) =>
                     setFormState((prev) => ({
                       ...prev,
-                      className: event.target.value,
+                      classId: event.target.value,
                     }))
                   }
                   required
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
-                  placeholder="contoh: XI IPA 1"
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-slate-500">
-                    Status Kehadiran
-                  </label>
-                  <select
-                    value={formState.lastStatus}
-                    onChange={(event) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        lastStatus: event.target.value as AttendanceStatus,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 focus:border-indigo-500 focus:ring-2"
-                  >
-                    {statusOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-slate-500">
-                    Jam Masuk
-                  </label>
-                  <input
-                    value={formState.lastCheckIn}
-                    onChange={(event) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        lastCheckIn: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
-                    placeholder="07:00"
-                  />
-                </div>
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
+                >
+                  <option value="">Pilih kelas…</option>
+                  {classes.map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </option>
+                  ))}
+                </select>
+                {classes.length === 0 && (
+                  <p className="mt-2 text-xs text-rose-500">
+                    Belum ada kelas. Tambahkan kelas terlebih dahulu.
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -340,6 +391,190 @@ export default function GuruSiswaPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isClassManagerOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm sm:items-center">
+          <div className="relative w-full max-w-xl rounded-3xl bg-white p-6 shadow-xl">
+            <button
+              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              onClick={() => {
+                setIsClassManagerOpen(false);
+                setClassError("");
+                setNewClassName("");
+              }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <h3 className="text-xl font-semibold text-slate-900">
+              Kelola Daftar Kelas
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Tambahkan atau perbarui nama kelas. Perubahan akan otomatis
+              diterapkan ke data siswa yang menggunakan kelas tersebut.
+            </p>
+
+            <div className="mt-6 space-y-4">
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  Tambah kelas baru
+                </label>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <input
+                    value={newClassName}
+                    onChange={(event) => setNewClassName(event.target.value)}
+                    placeholder="contoh: XII IPA 3"
+                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = newClassName.trim();
+                      if (!trimmed) return;
+                      const exists = classes.some(
+                        (classItem) =>
+                          classItem.name.toLocaleLowerCase("id-ID") ===
+                          trimmed.toLocaleLowerCase("id-ID")
+                      );
+                      if (exists) {
+                        setClassError("Kelas sudah terdaftar.");
+                        setNewClassName("");
+                        return;
+                      }
+                      const created = addClass(trimmed);
+                      if (created) {
+                        setClassDrafts((prev) => ({
+                          ...prev,
+                          [created.id]: created.name,
+                        }));
+                        setNewClassName("");
+                        setClassError("");
+                        if (!formState.classId) {
+                          setFormState((prev) => ({
+                            ...prev,
+                            classId: created.id,
+                          }));
+                        }
+                      } else {
+                        setClassError(
+                          "Kelas baru gagal ditambahkan. Coba lagi nanti."
+                        );
+                      }
+                    }}
+                    disabled={!newClassName.trim()}
+                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                  >
+                    Tambah Kelas
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-widest text-slate-500">
+                  Daftar kelas tersedia
+                </p>
+                {classes.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+                    Belum ada kelas. Tambahkan kelas baru terlebih dahulu.
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                    {classes.map((classItem) => (
+                      <div
+                        key={classItem.id}
+                        className="flex flex-col gap-3 rounded-2xl border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="flex-1">
+                          <input
+                            value={
+                              classDrafts[classItem.id] ?? classItem.name ?? ""
+                            }
+                            onChange={(event) =>
+                              setClassDrafts((prev) => ({
+                                ...prev,
+                                [classItem.id]: event.target.value,
+                              }))
+                            }
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none ring-indigo-500 focus:border-indigo-500 focus:ring-2"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const draftName =
+                                classDrafts[classItem.id]?.trim() ??
+                                classItem.name;
+                              updateClass(classItem.id, draftName);
+                              setClassDrafts((prev) => ({
+                                ...prev,
+                                [classItem.id]: draftName,
+                              }));
+                              setClassError("");
+                            }}
+                            className="inline-flex items-center justify-center rounded-full bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-100"
+                          >
+                            Simpan Nama
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const remaining = classes.filter(
+                                (item) => item.id !== classItem.id
+                              );
+                              const success = removeClass(classItem.id);
+                              if (!success) {
+                                setClassError(
+                                  "Kelas tidak dapat dihapus karena masih digunakan oleh siswa."
+                                );
+                                return;
+                              }
+                              setClassError("");
+                              setClassDrafts((prev) => {
+                                const nextDrafts = { ...prev };
+                                delete nextDrafts[classItem.id];
+                                return nextDrafts;
+                              });
+                              setFormState((prev) => {
+                                if (prev.classId === classItem.id) {
+                                  return {
+                                    ...prev,
+                                    classId: remaining[0]?.id ?? "",
+                                  };
+                                }
+                                return prev;
+                              });
+                            }}
+                            className="inline-flex items-center justify-center rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-500 transition hover:bg-rose-50"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {classError && (
+                  <p className="text-xs text-rose-500">{classError}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsClassManagerOpen(false);
+                  setClassError("");
+                  setNewClassName("");
+                }}
+                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+              >
+                Selesai
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -379,19 +614,4 @@ export default function GuruSiswaPage() {
       )}
     </div>
   );
-}
-
-function statusBadge(status: AttendanceStatus) {
-  switch (status) {
-    case "Hadir":
-      return "bg-emerald-100 text-emerald-600";
-    case "Sakit":
-      return "bg-amber-100 text-amber-600";
-    case "Izin":
-      return "bg-blue-100 text-blue-600";
-    case "Alfa":
-      return "bg-rose-100 text-rose-600";
-    default:
-      return "bg-slate-100 text-slate-600";
-  }
 }

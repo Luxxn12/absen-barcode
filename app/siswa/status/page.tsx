@@ -3,36 +3,36 @@
 import { useMemo } from "react";
 import { CalendarDays, CheckCircle2, Clock, Frown, Smile } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { AttendanceStatus, useStudents } from "@/contexts/StudentContext";
+import { useStudents } from "@/contexts/StudentContext";
+import {
+  AttendanceStatus,
+  useAttendance,
+} from "@/contexts/AttendanceContext";
 import { cn } from "@/lib/utils";
 
 type HistoryItem = {
   date: string;
-  status: AttendanceStatus;
-  time: string;
+  status: AttendanceStatus | "Belum Absen";
+  checkIn: string;
 };
 
-const pastHistory: HistoryItem[] = [
-  { date: "Kemarin", status: "Hadir", time: "07:05 WIB" },
-  { date: "2 hari lalu", status: "Hadir", time: "07:12 WIB" },
-  { date: "3 hari lalu", status: "Izin", time: "-" },
-];
-
-const statusBadge: Record<AttendanceStatus, string> = {
+const statusBadge: Record<AttendanceStatus | "Belum Absen", string> = {
   Hadir: "bg-emerald-100 text-emerald-600",
   Sakit: "bg-amber-100 text-amber-600",
   Izin: "bg-blue-100 text-blue-600",
   Alfa: "bg-rose-100 text-rose-600",
+  "Belum Absen": "bg-slate-100 text-slate-600",
 };
 
 export default function SiswaStatusPage() {
   const { session } = useAuth();
   const { getStudentById } = useStudents();
+  const { getRecordForStudent, getHistoryForStudent } = useAttendance();
 
   const student =
     session?.role === "siswa" ? getStudentById(session.studentId) : null;
 
-  const today = useMemo(
+  const todayLabel = useMemo(
     () =>
       new Date().toLocaleDateString("id-ID", {
         weekday: "long",
@@ -41,6 +41,85 @@ export default function SiswaStatusPage() {
       }),
     []
   );
+
+  const todayKey = useMemo(() => getDateKey(new Date()), []);
+  const yesterdayKey = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    return getDateKey(date);
+  }, []);
+
+  const todayRecord = useMemo(() => {
+    if (!student) return undefined;
+    return getRecordForStudent(student.id, todayKey);
+  }, [student, getRecordForStudent, todayKey]);
+
+  const historyRecords = useMemo(() => {
+    if (!student) return [];
+    return getHistoryForStudent(student.id, 4);
+  }, [student, getHistoryForStudent]);
+
+  const historyItems = useMemo<HistoryItem[]>(() => {
+    const items: HistoryItem[] = [];
+    const seen = new Set<string>();
+
+    if (todayRecord) {
+      items.push({
+        date: todayRecord.date,
+        status: todayRecord.status,
+        checkIn: todayRecord.checkIn,
+      });
+      seen.add(todayRecord.date);
+    } else if (student) {
+      items.push({
+        date: todayKey,
+        status: "Belum Absen",
+        checkIn: "-",
+      });
+      seen.add(todayKey);
+    }
+
+    historyRecords.forEach((record) => {
+      if (seen.has(record.date)) return;
+      items.push({
+        date: record.date,
+        status: record.status,
+        checkIn: record.checkIn,
+      });
+      seen.add(record.date);
+    });
+
+    return items;
+  }, [historyRecords, todayRecord, todayKey, student]);
+
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }),
+    []
+  );
+
+  const formatDateLabel = (isoDate: string) => {
+    if (isoDate === todayKey) return "Hari ini";
+    if (isoDate === yesterdayKey) return "Kemarin";
+    const target = new Date(`${isoDate}T00:00:00`);
+    return dateFormatter.format(target);
+  };
+
+  const statusLabel: AttendanceStatus | "Belum Absen" =
+    todayRecord?.status ?? "Belum Absen";
+  const checkInLabel = todayRecord?.checkIn ?? "-";
+  const statusMessage =
+    statusLabel === "Hadir"
+      ? "Selamat! Kamu sudah absen."
+      : statusLabel === "Belum Absen"
+        ? "Belum ada data hari ini. Silakan lakukan scan."
+        : "Segera lapor ke guru untuk konfirmasi.";
+  const checkInDisplay =
+    checkInLabel === "-" ? "Belum tercatat" : `${checkInLabel} WIB`;
 
   if (!student) {
     return (
@@ -60,7 +139,7 @@ export default function SiswaStatusPage() {
             Status Kehadiran Hari Ini
           </span>
           <h2 className="text-xl font-semibold text-slate-900">
-            {today}
+            {todayLabel}
           </h2>
         </div>
         <div className="mt-4 flex flex-col gap-4 rounded-3xl border border-slate-100 bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -69,27 +148,23 @@ export default function SiswaStatusPage() {
               Status Terakhir
             </p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {student.lastStatus}
+              {statusLabel}
             </p>
             <p className="text-sm text-slate-500">
               Jam absen:{" "}
               <span className="font-semibold text-slate-700">
-                {student.lastCheckIn === "—"
-                  ? "Belum tercatat"
-                  : `${student.lastCheckIn} WIB`}
+                {checkInDisplay}
               </span>
             </p>
           </div>
           <div
             className={cn(
               "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold",
-              statusBadge[student.lastStatus]
+              statusBadge[statusLabel]
             )}
           >
             <CheckCircle2 className="h-4 w-4" />
-            {student.lastStatus === "Hadir"
-              ? "Selamat! Kamu sudah absen."
-              : "Segera lapor ke guru untuk konfirmasi."}
+            {statusMessage}
           </div>
         </div>
         <div className="mt-5 rounded-2xl bg-white px-4 py-3 text-xs text-slate-500">
@@ -109,34 +184,48 @@ export default function SiswaStatusPage() {
           </span>
         </header>
         <div className="space-y-3">
-          {[{ date: "Hari ini", status: student.lastStatus, time: student.lastCheckIn === "—" ? "-" : `${student.lastCheckIn} WIB` }, ...pastHistory].map(
-            (item, index) => (
-              <div
-                key={`${item.date}-${index}`}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-100 bg-slate-50 px-5 py-4 sm:flex-nowrap"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {item.date}
-                  </p>
-                  <p className="text-xs text-slate-500">{item.time}</p>
+          {historyItems.length > 0 ? (
+            historyItems.map((item, index) => {
+              const Icon = item.status === "Hadir" ? Smile : Frown;
+              const timeLabel =
+                item.checkIn === "-" ? "-" : `${item.checkIn} WIB`;
+              return (
+                <div
+                  key={`${item.date}-${index}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-100 bg-slate-50 px-5 py-4 sm:flex-nowrap"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {formatDateLabel(item.date)}
+                    </p>
+                    <p className="text-xs text-slate-500">{timeLabel}</p>
+                  </div>
+                  <div className="w-full text-left sm:w-auto sm:text-right">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-semibold",
+                        statusBadge[item.status]
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.status}
+                    </span>
+                  </div>
                 </div>
-                <div className="w-full text-left sm:w-auto sm:text-right">
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-semibold",
-                      statusBadge[item.status]
-                    )}
-                  >
-                    <Smile className="h-4 w-4" />
-                    {item.status}
-                  </span>
-                </div>
-              </div>
-            )
+              );
+            })
+          ) : (
+            <div className="rounded-3xl border border-dashed border-slate-200 px-5 py-8 text-center text-sm text-slate-500">
+              Belum ada riwayat kehadiran yang tersimpan.
+            </div>
           )}
         </div>
       </section>
     </div>
   );
+}
+
+function getDateKey(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().split("T")[0];
 }

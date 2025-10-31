@@ -5,8 +5,9 @@ import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, Info, RefreshCw, XCircle } from "lucide-react";
 import {
   AttendanceStatus,
-  useStudents,
-} from "@/contexts/StudentContext";
+  useAttendance,
+} from "@/contexts/AttendanceContext";
+import { useStudents } from "@/contexts/StudentContext";
 import { cn } from "@/lib/utils";
 
 const BarcodeScannerComponent = dynamic(
@@ -24,7 +25,8 @@ type ScanState = {
 };
 
 export default function SiswaScanPage() {
-  const { getStudentById, updateStudent } = useStudents();
+  const { getStudentById } = useStudents();
+  const { updateAttendance } = useAttendance();
   const [hasPermissionIssue, setHasPermissionIssue] = useState(false);
   const [scanState, setScanState] = useState<ScanState>({
     status: "idle",
@@ -57,10 +59,7 @@ export default function SiswaScanPage() {
           hour: "2-digit",
           minute: "2-digit",
         });
-        updateStudent(student.id, {
-          lastStatus: "Hadir",
-          lastCheckIn: time,
-        });
+        updateAttendance(student.id, "Hadir", time);
         setScanState({
           status: "success",
           message: `Absen berhasil untuk ${student.name}!`,
@@ -77,7 +76,7 @@ export default function SiswaScanPage() {
         });
       }
     },
-    [getStudentById, updateStudent]
+    [getStudentById, updateAttendance]
   );
 
   return (

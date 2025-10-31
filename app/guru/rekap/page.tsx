@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { CalendarRange, Download, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +94,43 @@ export default function GuruRekapPage() {
   const totalIzin = filtered.reduce((total, item) => total + item.izin, 0);
   const totalAlfa = filtered.reduce((total, item) => total + item.alfa, 0);
 
+  const exportRekap = useCallback(() => {
+    if (!filtered.length) return;
+    const headers = [
+      "Nama",
+      "Kelas",
+      "Hadir (hari)",
+      "Sakit (hari)",
+      "Izin (hari)",
+      "Alfa (hari)",
+    ];
+    const csvContent = [
+      headers.join(","),
+      ...filtered.map((item) =>
+        [
+          `"${item.student.replace(/"/g, '""')}"`,
+          `"${item.className.replace(/"/g, '""')}"`,
+          item.hadir,
+          item.sakit,
+          item.izin,
+          item.alfa,
+        ].join(",")
+      ),
+    ].join("\n");
+    const fileName = `rekap-bulanan-${selectedMonth}-${selectedClass.replace(/\s+/g, "-")}.csv`;
+    const blob = new Blob([`\ufeff${csvContent}`], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [filtered, selectedMonth, selectedClass]);
+
   return (
     <div className="space-y-6">
       <section className="rounded-3xl bg-white p-6 shadow-lg shadow-slate-200/40">
@@ -109,7 +146,11 @@ export default function GuruRekapPage() {
               Data dummy untuk simulasi laporan. Filter berdasarkan bulan dan kelas.
             </p>
           </div>
-          <button className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">
+          <button
+            onClick={exportRekap}
+            disabled={!filtered.length}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             <Download className="h-4 w-4" />
             Unduh Rekap
           </button>
