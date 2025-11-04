@@ -47,7 +47,7 @@ export default function SiswaScanPage() {
   );
 
   const handleScan = useCallback(
-    (_err: unknown, result: { text: string } | null) => {
+    async (_err: unknown, result: { text: string } | null) => {
       if (!result) return;
       const text = result.text.trim();
       if (!text) return;
@@ -59,15 +59,26 @@ export default function SiswaScanPage() {
           hour: "2-digit",
           minute: "2-digit",
         });
-        updateAttendance(student.id, "Hadir", time);
-        setScanState({
-          status: "success",
-          message: `Absen berhasil untuk ${student.name}!`,
-          scannedId: text,
-          timestamp: `${time} WIB`,
-          studentName: student.name,
-          className: student.className,
-        });
+        const saved = await updateAttendance(student.id, "Hadir", time);
+        if (saved) {
+          setScanState({
+            status: "success",
+            message: `Absen berhasil untuk ${student.name}!`,
+            scannedId: text,
+            timestamp: `${time} WIB`,
+            studentName: student.name,
+            className: student.className,
+          });
+        } else {
+          setScanState({
+            status: "error",
+            message:
+              "Gagal menyimpan kehadiran. Periksa koneksi internet dan coba lagi.",
+            scannedId: text,
+            studentName: student.name,
+            className: student.className,
+          });
+        }
       } else {
         setScanState({
           status: "error",
@@ -101,7 +112,7 @@ export default function SiswaScanPage() {
           refresh kamera.
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-3xl border border-slate-100 bg-black/80 text-white">
+        <div className="relative mt-5 overflow-hidden rounded-3xl border border-slate-100 bg-black/80 text-white">
           <BarcodeScannerComponent
             key={cameraKey}
             width={500}
@@ -114,9 +125,17 @@ export default function SiswaScanPage() {
               if (hasPermissionIssue) {
                 setHasPermissionIssue(false);
               }
-              handleScan(err, result);
+              void handleScan(err, result);
             }}
           />
+          {scanState.status === "success" && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/70 px-4 text-center">
+              <div className="inline-flex items-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-sm font-semibold text-emerald-600 shadow-lg shadow-emerald-500/30">
+                <CheckCircle2 className="h-5 w-5" />
+                {scanState.message}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -180,8 +199,8 @@ export default function SiswaScanPage() {
             Jam Absen: <strong>{scanState.timestamp}</strong>
           </p>
           <p className="mt-2 text-xs">
-            Simpan layar ini sebagai bukti jika diperlukan. Data disimpan secara
-            lokal dan akan terlihat di menu status.
+            Simpan layar ini sebagai bukti jika diperlukan. Data tersimpan di
+            sistem dan akan terlihat di menu status.
           </p>
         </section>
       )}

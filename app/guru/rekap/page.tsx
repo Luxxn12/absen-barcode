@@ -1,11 +1,15 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CalendarRange, Download, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useStudents } from "@/contexts/StudentContext";
+import { useAttendance } from "@/contexts/AttendanceContext";
 
-type RekapItem = {
-  student: string;
+type RecapRow = {
+  studentId: string;
+  studentName: string;
+  classId: string;
   className: string;
   hadir: number;
   sakit: number;
@@ -13,89 +17,152 @@ type RekapItem = {
   alfa: number;
 };
 
-const dummyRekap: RekapItem[] = [
-  {
-    student: "Ahmad Fauzi",
-    className: "X IPA 1",
-    hadir: 18,
-    sakit: 1,
-    izin: 1,
-    alfa: 0,
-  },
-  {
-    student: "Siti Rahma",
-    className: "X IPA 2",
-    hadir: 16,
-    sakit: 2,
-    izin: 1,
-    alfa: 1,
-  },
-  {
-    student: "Budi Santoso",
-    className: "X IPS 1",
-    hadir: 19,
-    sakit: 0,
-    izin: 0,
-    alfa: 1,
-  },
-  {
-    student: "Lina Kartika",
-    className: "XI IPA 1",
-    hadir: 17,
-    sakit: 1,
-    izin: 2,
-    alfa: 0,
-  },
-  {
-    student: "Dewi Lestari",
-    className: "XI IPS 2",
-    hadir: 14,
-    sakit: 3,
-    izin: 1,
-    alfa: 2,
-  },
-];
+const monthFormatter = new Intl.DateTimeFormat("id-ID", {
+  month: "long",
+  year: "numeric",
+});
 
-const months = [
-  "Januari",
-  "Februari",
-  "Maret",
-  "April",
-  "Mei",
-  "Juni",
-  "Juli",
-  "Agustus",
-  "September",
-  "Oktober",
-  "November",
-  "Desember",
-];
+function getMonthKey(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 7);
+}
 
-const classes = [
-  "Semua Kelas",
-  "X IPA 1",
-  "X IPA 2",
-  "X IPS 1",
-  "XI IPA 1",
-  "XI IPS 2",
-];
+function formatMonthLabel(key: string | undefined) {
+  if (!key) return "-";
+  const target = new Date(`${key}-01T00:00:00`);
+  return monthFormatter.format(target);
+}
+
+const currentMonthKey = getMonthKey(new Date());
 
 export default function GuruRekapPage() {
-  const [selectedMonth, setSelectedMonth] = useState(months[new Date().getMonth()]);
-  const [selectedClass, setSelectedClass] = useState(classes[0]);
+  const {
+    students,
+    classes,
+    loading: studentsLoading,
+  } = useStudents();
+  const { records, loading: attendanceLoading } = useAttendance();
 
-  const filtered = useMemo(() => {
-    if (selectedClass === "Semua Kelas") return dummyRekap;
-    return dummyRekap.filter((item) => item.className === selectedClass);
-  }, [selectedClass]);
+  const loading = studentsLoading || attendanceLoading;
 
-  const totalHadir = filtered.reduce((total, item) => total + item.hadir, 0);
-  const totalSakit = filtered.reduce((total, item) => total + item.sakit, 0);
-  const totalIzin = filtered.reduce((total, item) => total + item.izin, 0);
-  const totalAlfa = filtered.reduce((total, item) => total + item.alfa, 0);
+  const monthOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    records.forEach((record) => {
+      const key = record.date.slice(0, 7);
+      if (!map.has(key)) {
+        map.set(key, formatMonthLabel(key));
+      }
+    });
+    if (map.size === 0) {
+      map.set(currentMonthKey, formatMonthLabel(currentMonthKey));
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, label]) => ({ key, label }));
+  }, [records]);
+
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(
+    monthOptions[0]?.key ?? currentMonthKey
+  );
+  const safeSelectedMonthKey = useMemo(() => {
+    if (!monthOptions.length) return selectedMonthKey;
+    if (monthOptions.some((option) => option.key === selectedMonthKey)) {
+      return selectedMonthKey;
+    }
+    return monthOptions[0].key;
+  }, [monthOptions, selectedMonthKey]);
+
+  const classOptions = useMemo(
+    () => [
+      { id: "all", name: "Semua Kelas" },
+      ...classes.map((item) => ({ id: item.id, name: item.name })),
+    ],
+    [classes]
+  );
+
+  const [selectedClassId, setSelectedClassId] = useState<string>("all");
+  const safeSelectedClassId = useMemo(() => {
+    if (selectedClassId === "all") return "all";
+    if (classes.some((classItem) => classItem.id === selectedClassId)) {
+      return selectedClassId;
+    }
+    return "all";
+  }, [classes, selectedClassId]);
+
+  const recapRows = useMemo<RecapRow[]>(() => {
+    if (!safeSelectedMonthKey) return [];
+    const filteredStudents =
+      safeSelectedClassId === "all"
+        ? students
+        : students.filter((student) => student.classId === safeSelectedClassId);
+
+    if (!filteredStudents.length) return [];
+
+    const map = new Map<string, RecapRow>();
+    filteredStudents.forEach((student) => {
+      map.set(student.id, {
+        studentId: student.id,
+        studentName: student.name,
+        classId: student.classId,
+        className: student.className,
+        hadir: 0,
+        sakit: 0,
+        izin: 0,
+        alfa: 0,
+      });
+    });
+
+    records.forEach((record) => {
+      if (!record.date.startsWith(safeSelectedMonthKey)) return;
+      const entry = map.get(record.studentId);
+      if (!entry) return;
+      switch (record.status) {
+        case "Hadir":
+          entry.hadir += 1;
+          break;
+        case "Sakit":
+          entry.sakit += 1;
+          break;
+        case "Izin":
+          entry.izin += 1;
+          break;
+        case "Alfa":
+          entry.alfa += 1;
+          break;
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.studentName.localeCompare(b.studentName, "id-ID", {
+        sensitivity: "base",
+      })
+    );
+  }, [records, students, safeSelectedClassId, safeSelectedMonthKey]);
+
+  const totals = useMemo(
+    () =>
+      recapRows.reduce(
+        (acc, row) => ({
+          hadir: acc.hadir + row.hadir,
+          sakit: acc.sakit + row.sakit,
+          izin: acc.izin + row.izin,
+          alfa: acc.alfa + row.alfa,
+        }),
+        { hadir: 0, sakit: 0, izin: 0, alfa: 0 }
+      ),
+    [recapRows]
+  );
+
+  const selectedMonthLabel =
+    monthOptions.find((option) => option.key === safeSelectedMonthKey)?.label ??
+    formatMonthLabel(safeSelectedMonthKey);
+
+  const selectedClassLabel =
+    classOptions.find((option) => option.id === safeSelectedClassId)?.name ??
+    "Semua Kelas";
 
   const exportRekap = useCallback(() => {
-    if (!filtered.length) return;
+    if (!recapRows.length) return;
     const headers = [
       "Nama",
       "Kelas",
@@ -106,9 +173,9 @@ export default function GuruRekapPage() {
     ];
     const csvContent = [
       headers.join(","),
-      ...filtered.map((item) =>
+      ...recapRows.map((item) =>
         [
-          `"${item.student.replace(/"/g, '""')}"`,
+          `"${item.studentName.replace(/"/g, '""')}"`,
           `"${item.className.replace(/"/g, '""')}"`,
           item.hadir,
           item.sakit,
@@ -117,7 +184,11 @@ export default function GuruRekapPage() {
         ].join(",")
       ),
     ].join("\n");
-    const fileName = `rekap-bulanan-${selectedMonth}-${selectedClass.replace(/\s+/g, "-")}.csv`;
+    const fileName = `rekap-bulanan-${selectedMonthLabel
+      .toLowerCase()
+      .replace(/\s+/g, "-")}-${selectedClassLabel
+      .toLowerCase()
+      .replace(/\s+/g, "-")}.csv`;
     const blob = new Blob([`\ufeff${csvContent}`], {
       type: "text/csv;charset=utf-8;",
     });
@@ -129,7 +200,7 @@ export default function GuruRekapPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [filtered, selectedMonth, selectedClass]);
+  }, [recapRows, selectedMonthLabel, selectedClassLabel]);
 
   return (
     <div className="space-y-6">
@@ -143,12 +214,13 @@ export default function GuruRekapPage() {
               Ringkasan kehadiran per kelas
             </h2>
             <p className="text-sm text-slate-500">
-              Data dummy untuk simulasi laporan. Filter berdasarkan bulan dan kelas.
+              Data dihitung otomatis dari hasil absensi harian. Pilih bulan dan
+              kelas untuk melihat statistik detail.
             </p>
           </div>
           <button
             onClick={exportRekap}
-            disabled={!filtered.length}
+            disabled={!recapRows.length}
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
@@ -157,10 +229,26 @@ export default function GuruRekapPage() {
         </header>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Total Hadir" value={`${totalHadir} hari`} accent="bg-emerald-500/20 text-emerald-600" />
-          <StatCard label="Sakit" value={`${totalSakit} hari`} accent="bg-amber-500/20 text-amber-600" />
-          <StatCard label="Izin" value={`${totalIzin} hari`} accent="bg-blue-500/20 text-blue-600" />
-          <StatCard label="Tanpa Keterangan" value={`${totalAlfa} hari`} accent="bg-rose-500/20 text-rose-600" />
+          <StatCard
+            label="Total Hadir"
+            value={`${totals.hadir} hari`}
+            accent="bg-emerald-500/20 text-emerald-600"
+          />
+          <StatCard
+            label="Sakit"
+            value={`${totals.sakit} hari`}
+            accent="bg-amber-500/20 text-amber-600"
+          />
+          <StatCard
+            label="Izin"
+            value={`${totals.izin} hari`}
+            accent="bg-blue-500/20 text-blue-600"
+          />
+          <StatCard
+            label="Tanpa Keterangan"
+            value={`${totals.alfa} hari`}
+            accent="bg-rose-500/20 text-rose-600"
+          />
         </div>
 
         <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -168,68 +256,91 @@ export default function GuruRekapPage() {
             <div className="relative flex-1">
               <CalendarRange className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <select
-                value={selectedMonth}
-                onChange={(event) => setSelectedMonth(event.target.value)}
+                value={safeSelectedMonthKey}
+                onChange={(event) => setSelectedMonthKey(event.target.value)}
                 className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 focus:border-indigo-500 focus:ring-2"
               >
-                {months.map((month) => (
-                  <option key={month}>{month}</option>
+                {monthOptions.map((month) => (
+                  <option key={month.key} value={month.key}>
+                    {month.label}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="relative flex-1">
               <Filter className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <select
-                value={selectedClass}
-                onChange={(event) => setSelectedClass(event.target.value)}
+                value={safeSelectedClassId}
+                onChange={(event) => setSelectedClassId(event.target.value)}
                 className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 focus:border-indigo-500 focus:ring-2"
               >
-                {classes.map((item) => (
-                  <option key={item}>{item}</option>
+                {classOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
           <p className="text-xs text-slate-400">
-            Menampilkan <strong>{filtered.length}</strong> siswa untuk{" "}
-            <span className="font-semibold text-slate-600">{selectedClass}</span>{" "}
-            bulan <span className="font-semibold text-slate-600">{selectedMonth}</span>
+            {loading ? (
+              "Memuat data rekap..."
+            ) : (
+              <>
+                Menampilkan <strong>{recapRows.length}</strong> siswa untuk{" "}
+                <span className="font-semibold text-slate-600">
+                  {selectedClassLabel}
+                </span>{" "}
+                bulan{" "}
+                <span className="font-semibold text-slate-600">
+                  {selectedMonthLabel}
+                </span>
+              </>
+            )}
           </p>
         </div>
 
         <div className="mt-6 overflow-hidden rounded-3xl border border-slate-100">
-          <table className="min-w-full bg-white text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-500">
-              <tr>
-                <th className="px-6 py-3">Siswa</th>
-                <th className="px-6 py-3">Kelas</th>
-                <th className="px-6 py-3">Hadir</th>
-                <th className="px-6 py-3">Sakit</th>
-                <th className="px-6 py-3">Izin</th>
-                <th className="px-6 py-3">Alfa</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-600">
-              {filtered.map((item) => (
-                <tr key={item.student} className="transition hover:bg-slate-50/60">
-                  <td className="px-6 py-4 font-semibold text-slate-900">
-                    {item.student}
-                  </td>
-                  <td className="px-6 py-4">{item.className}</td>
-                  <td className="px-6 py-4 font-semibold text-slate-700">
-                    {item.hadir}
-                  </td>
-                  <td className="px-6 py-4">{item.sakit}</td>
-                  <td className="px-6 py-4">{item.izin}</td>
-                  <td className="px-6 py-4 text-rose-500">{item.alfa}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
+          {loading ? (
+            <div className="p-10 text-center text-sm text-slate-500">
+              Memuat data rekap...
+            </div>
+          ) : recapRows.length === 0 ? (
             <div className="p-10 text-center text-sm text-slate-500">
               Tidak ada data rekap untuk filter yang dipilih.
             </div>
+          ) : (
+            <table className="min-w-full bg-white text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-widest text-slate-500">
+                <tr>
+                  <th className="px-6 py-3">Siswa</th>
+                  <th className="px-6 py-3">Kelas</th>
+                  <th className="px-6 py-3">Hadir</th>
+                  <th className="px-6 py-3">Sakit</th>
+                  <th className="px-6 py-3">Izin</th>
+                  <th className="px-6 py-3">Alfa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-600">
+                {recapRows.map((row) => (
+                  <tr
+                    key={row.studentId}
+                    className="transition hover:bg-slate-50/60"
+                  >
+                    <td className="px-6 py-4 font-semibold text-slate-900">
+                      {row.studentName}
+                    </td>
+                    <td className="px-6 py-4">{row.className}</td>
+                    <td className="px-6 py-4 font-semibold text-slate-700">
+                      {row.hadir}
+                    </td>
+                    <td className="px-6 py-4">{row.sakit}</td>
+                    <td className="px-6 py-4">{row.izin}</td>
+                    <td className="px-6 py-4 text-rose-500">{row.alfa}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </section>
@@ -252,7 +363,12 @@ function StatCard({
         {label}
       </p>
       <p className="mt-3 text-2xl font-semibold text-slate-900">{value}</p>
-      <div className={cn("mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold", accent)}>
+      <div
+        className={cn(
+          "mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold",
+          accent
+        )}
+      >
         {label}
       </div>
     </div>

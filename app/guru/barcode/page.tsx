@@ -6,7 +6,7 @@ import { Download, Printer, Search, X } from "lucide-react";
 import { useStudents } from "@/contexts/StudentContext";
 
 export default function GuruBarcodePage() {
-  const { students } = useStudents();
+  const { students, loading } = useStudents();
   const [search, setSearch] = useState("");
   const [previewStudentId, setPreviewStudentId] = useState<string | null>(null);
   const qrRefs = useRef<Record<string, SVGSVGElement | null>>({});
@@ -56,7 +56,7 @@ export default function GuruBarcodePage() {
 
   const printStudents = useCallback(
     (studentsToPrint: typeof filtered) => {
-      if (!studentsToPrint.length) return;
+      if (loading || !studentsToPrint.length) return;
       const printWindow = window.open("", "_blank", "width=1024,height=768");
       if (!printWindow) return;
       const cardsHtml = studentsToPrint
@@ -111,7 +111,7 @@ export default function GuruBarcodePage() {
         printWindow.close();
       }, 300);
     },
-    [serializeSvg]
+    [serializeSvg, loading]
   );
 
   const handleUseQr = useCallback((studentId: string) => {
@@ -148,7 +148,7 @@ export default function GuruBarcodePage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => printStudents(filtered)}
-              disabled={!filtered.length}
+              disabled={loading || !filtered.length}
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Printer className="h-4 w-4" />
@@ -168,12 +168,18 @@ export default function GuruBarcodePage() {
             />
           </div>
           <p className="text-xs text-slate-400">
-            Total QR ditampilkan: <strong>{filtered.length}</strong>
+            {loading ? (
+              "Memuat data siswa..."
+            ) : (
+              <>
+                Total QR ditampilkan: <strong>{filtered.length}</strong>
+              </>
+            )}
           </p>
         </div>
 
         <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((student) => (
+          {!loading && filtered.map((student) => (
             <article
               key={student.id}
               className="flex flex-col items-center rounded-3xl border border-slate-100 bg-white p-6 text-center shadow-sm transition hover:shadow-md"
@@ -213,6 +219,29 @@ export default function GuruBarcodePage() {
               </div>
             </article>
           ))}
+          {!loading && filtered.length === 0 && (
+            <div className="rounded-3xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
+              Tidak ada data siswa sesuai pencarian.
+            </div>
+          )}
+          {loading && (
+            <div className="space-y-4">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={`loading-${index}`}
+                  className="animate-pulse rounded-3xl border border-slate-100 bg-white p-6"
+                >
+                  <div className="h-48 rounded-2xl bg-slate-100" />
+                  <div className="mt-4 h-4 w-3/4 rounded-full bg-slate-200" />
+                  <div className="mt-2 h-3 w-1/2 rounded-full bg-slate-200" />
+                  <div className="mt-4 flex gap-2">
+                    <div className="h-8 w-24 rounded-full bg-slate-200" />
+                    <div className="h-8 w-24 rounded-full bg-slate-200" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {filtered.length === 0 && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, Check, ListChecks, Search } from "lucide-react";
+import { CalendarDays, Check, ListChecks, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStudents } from "@/contexts/StudentContext";
 import {
@@ -30,8 +30,12 @@ const statusColors: Record<
 
 export default function GuruStatusPage() {
   const { students } = useStudents();
-  const { getAvailableDates, getRecordsByDate, updateAttendance } =
-    useAttendance();
+  const {
+    getAvailableDates,
+    getRecordsByDate,
+    updateAttendance,
+    loading,
+  } = useAttendance();
 
   const fallbackDate = useMemo(() => getDateKey(new Date()), []);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -52,6 +56,8 @@ export default function GuruStatusPage() {
     Record<string, AttendanceStatus>
   >({});
   const [pendingTimes, setPendingTimes] = useState<Record<string, string>>({});
+  const [actionError, setActionError] = useState("");
+  const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
 
   const recordsForDate = useMemo(
     () => getRecordsByDate(activeDate),
@@ -158,7 +164,8 @@ export default function GuruStatusPage() {
     }));
   };
 
-  const handleSave = (studentId: string) => {
+  const handleSave = async (studentId: string) => {
+    if (savingMap[studentId]) return;
     const row = rows.find((item) => item.id === studentId);
     if (!row) return;
 
@@ -173,26 +180,38 @@ export default function GuruStatusPage() {
         : "";
 
     const finalTime =
-      selectedStatus === "Hadir"
-        ? selectedTime || getCurrentTime()
-        : "-";
-    updateAttendance(
-      studentId,
-      selectedStatus,
-      finalTime,
-      { date: activeDate }
-    );
+      selectedStatus === "Hadir" ? selectedTime || getCurrentTime() : "-";
+    setSavingMap((prev) => ({ ...prev, [studentId]: true }));
+    try {
+      const saved = await updateAttendance(
+        studentId,
+        selectedStatus,
+        finalTime,
+        { date: activeDate }
+      );
+      if (!saved) {
+        setActionError("Gagal menyimpan status kehadiran. Coba lagi.");
+        return;
+      }
+      setActionError("");
 
-    setPendingStatus((prev) => {
-      const next = { ...prev };
-      delete next[studentId];
-      return next;
-    });
-    setPendingTimes((prev) => {
-      const next = { ...prev };
-      delete next[studentId];
-      return next;
-    });
+      setPendingStatus((prev) => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
+      setPendingTimes((prev) => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
+    } finally {
+      setSavingMap((prev) => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
+    }
   };
 
   return (
@@ -211,13 +230,19 @@ export default function GuruStatusPage() {
               terbaru untuk <span className="font-semibold text-slate-700">{dateLabel}</span>.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-600">
-            <ListChecks className="h-4 w-4" />
-            {totalStudents} siswa terdaftar
-          </div>
-        </header>
+        <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-600">
+          <ListChecks className="h-4 w-4" />
+          {loading ? "Memuat data…" : `${totalStudents} siswa terdaftar`}
+        </div>
+      </header>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {actionError && (
+        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-600">
+          {actionError}
+        </div>
+      )}
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryStat
             label="Hadir"
             value={`${summary.Hadir} siswa`}
@@ -295,6 +320,7 @@ export default function GuruStatusPage() {
                   pendingTimes[row.id] ??
                   (row.checkIn === "-" ? "" : row.checkIn);
                 const isHadir = draftStatus === "Hadir";
+                const isSaving = Boolean(savingMap[row.id]);
                 const timeValue = isHadir ? baseTime : "";
 
                 return (
@@ -333,7 +359,8 @@ export default function GuruStatusPage() {
                                 event.target.value as AttendanceStatus
                               )
                             }
-                            className="w-full rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 sm:w-32"
+                            disabled={isSaving}
+                            className="w-full rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 sm:w-32 disabled:cursor-not-allowed disabled:bg-slate-100"
                           >
                             {statusOptions.map((status) => (
                               <option key={status} value={status}>
@@ -347,17 +374,27 @@ export default function GuruStatusPage() {
                             onChange={(event) =>
                               handleTimeDraft(row.id, event.target.value)
                             }
-                            disabled={!isHadir}
-                            className="w-full rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 sm:w-24 disabled:opacity-50"
+                            disabled={!isHadir || isSaving}
+                            className="w-full rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 sm:w-24 disabled:cursor-not-allowed disabled:bg-slate-100"
                           />
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleSave(row.id)}
-                          className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+                          onClick={() => void handleSave(row.id)}
+                          disabled={loading || isSaving}
+                          className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
                         >
-                          <Check className="h-3.5 w-3.5" />
-                          Simpan
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Menyimpan...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="h-3.5 w-3.5" />
+                              Simpan
+                            </>
+                          )}
                         </button>
                       </div>
                     </td>
