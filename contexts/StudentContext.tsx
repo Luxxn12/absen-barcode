@@ -1,11 +1,20 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useHydrated } from "@/hooks/useHydrated";
+import { fetchJSON } from "@/lib/fetchJSON";
 
 export type Student = {
   id: string;
   name: string;
+  classId: string;
   className: string;
 };
 
@@ -14,257 +23,215 @@ export type ClassGroup = {
   name: string;
 };
 
+export type AddStudentPayload = {
+  name: string;
+  classId: string;
+};
+
+export type UpdateStudentPayload = {
+  name?: string;
+  classId?: string;
+};
+
 type StudentContextValue = {
   students: Student[];
   classes: ClassGroup[];
   hydrated: boolean;
-  addStudent: (student: AddStudentPayload) => void;
+  loading: boolean;
+  addStudent: (student: AddStudentPayload) => Promise<Student | null>;
   updateStudent: (
     id: string,
-    updates: Partial<Omit<Student, "id">>
-  ) => void;
-  removeStudent: (id: string) => void;
+    updates: UpdateStudentPayload
+  ) => Promise<Student | null>;
+  removeStudent: (id: string) => Promise<boolean>;
   getStudentById: (id: string) => Student | undefined;
-  addClass: (name: string) => ClassGroup | null;
-  updateClass: (id: string, name: string) => void;
-  removeClass: (id: string) => boolean;
-};
-
-type AddStudentPayload = {
-  name: string;
-  className: string;
+  addClass: (name: string) => Promise<ClassGroup | null>;
+  updateClass: (id: string, name: string) => Promise<ClassGroup>;
+  removeClass: (id: string) => Promise<boolean>;
+  refresh: () => Promise<void>;
 };
 
 const StudentContext = createContext<StudentContextValue | null>(null);
 
-const STORAGE_KEY = "absen-barcode-students";
-const STORAGE_VERSION = 2;
-
-const defaultClasses: ClassGroup[] = [
-  { id: "CLS-001", name: "X IPA 1" },
-  { id: "CLS-002", name: "X IPA 2" },
-  { id: "CLS-003", name: "X IPS 1" },
-  { id: "CLS-004", name: "XI IPA 1" },
-  { id: "CLS-005", name: "XI IPS 2" },
-  { id: "CLS-006", name: "XII IPA 1" },
-  { id: "CLS-007", name: "XII IPS 1" },
-  { id: "CLS-008", name: "X IPA 3" },
-  { id: "CLS-009", name: "XI IPA 2" },
-  { id: "CLS-010", name: "XI IPS 1" },
-  { id: "CLS-011", name: "XII IPA 2" },
-];
-
-const defaultStudents: Student[] = [
-  {
-    id: "STD-001",
-    name: "Ahmad Fauzi",
-    className: "X IPA 1",
-  },
-  {
-    id: "STD-002",
-    name: "Siti Rahma",
-    className: "X IPA 2",
-  },
-  {
-    id: "STD-003",
-    name: "Budi Santoso",
-    className: "X IPS 1",
-  },
-  {
-    id: "STD-004",
-    name: "Lina Kartika",
-    className: "XI IPA 1",
-  },
-  {
-    id: "STD-005",
-    name: "Dewi Lestari",
-    className: "XI IPS 2",
-  },
-  {
-    id: "STD-006",
-    name: "Rudi Hartono",
-    className: "XII IPA 1",
-  },
-  {
-    id: "STD-007",
-    name: "Maria Ulfa",
-    className: "XII IPS 1",
-  },
-  {
-    id: "STD-008",
-    name: "Eko Prasetyo",
-    className: "X IPA 3",
-  },
-  {
-    id: "STD-009",
-    name: "Nina Safitri",
-    className: "XI IPA 2",
-  },
-  {
-    id: "STD-010",
-    name: "Bagus Saputra",
-    className: "XI IPS 1",
-  },
-  {
-    id: "STD-011",
-    name: "Intan Cahya",
-    className: "X IPA 1",
-  },
-  {
-    id: "STD-012",
-    name: "Hendra Wijaya",
-    className: "XII IPA 2",
-  },
-];
+function sortByName<T extends { name: string }>(data: T[]) {
+  return [...data].sort((a, b) =>
+    a.name.localeCompare(b.name, "id-ID", { sensitivity: "base" })
+  );
+}
 
 export function StudentProvider({ children }: { children: React.ReactNode }) {
-  const isClient = typeof window !== "undefined";
   const hydrated = useHydrated();
-  const initialState = useMemo(() => {
-    if (!isClient) {
-      return {
-        students: defaultStudents,
-        classes: defaultClasses,
-      };
-    }
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      return {
-        students: defaultStudents,
-        classes: defaultClasses,
-      };
-    }
+  const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<ClassGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
     try {
-      const parsed = JSON.parse(stored) as
-        | Student[]
-        | {
-            version?: number;
-            students: Student[];
-            classes?: ClassGroup[];
-          };
-      if (Array.isArray(parsed)) {
-        return {
-          students: parsed,
-          classes: defaultClasses,
-        };
-      }
-      if (parsed && Array.isArray(parsed.students)) {
-        return {
-          students: parsed.students.length ? parsed.students : defaultStudents,
-          classes:
-            Array.isArray(parsed.classes) && parsed.classes.length
-              ? parsed.classes
-              : defaultClasses,
-        };
-      }
-    } catch {
-      // ignore malformed data and fall back to defaults
+      const [studentData, classData] = await Promise.all([
+        fetchJSON<Student[]>("/api/students"),
+        fetchJSON<ClassGroup[]>("/api/classes"),
+      ]);
+      setStudents(sortByName(studentData));
+      setClasses(sortByName(classData));
+    } catch (error) {
+      console.error("Gagal memuat data siswa/kelas:", error);
+    } finally {
+      setLoading(false);
     }
-    return {
-      students: defaultStudents,
-      classes: defaultClasses,
-    };
-  }, [isClient]);
-  const [students, setStudents] = useState<Student[]>(initialState.students);
-  const [classes, setClasses] = useState<ClassGroup[]>(initialState.classes);
+  }, []);
 
   useEffect(() => {
-    if (!hydrated || !isClient) return;
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: STORAGE_VERSION,
-        students,
-        classes,
-      })
-    );
-  }, [hydrated, students, classes, isClient]);
+    if (!hydrated) return;
+    void refresh();
+  }, [hydrated, refresh]);
+
+  const addStudent = useCallback(
+    async (payload: AddStudentPayload) => {
+      try {
+        const created = await fetchJSON<Student>("/api/students", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        setStudents((prev) => sortByName([...prev, created]));
+        return created;
+      } catch (error) {
+        console.error("Gagal menambahkan siswa:", error);
+        return null;
+      }
+    },
+    []
+  );
+
+  const updateStudent = useCallback(
+    async (id: string, updates: UpdateStudentPayload) => {
+      try {
+        const updated = await fetchJSON<Student>(`/api/students/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        });
+        setStudents((prev) =>
+          sortByName(prev.map((student) => (student.id === id ? updated : student)))
+        );
+        return updated;
+      } catch (error) {
+        console.error("Gagal memperbarui siswa:", error);
+        return null;
+      }
+    },
+    []
+  );
+
+  const removeStudent = useCallback(async (id: string) => {
+    try {
+      await fetchJSON(`/api/students/${id}`, {
+        method: "DELETE",
+      });
+      setStudents((prev) => prev.filter((student) => student.id !== id));
+      return true;
+    } catch (error) {
+      console.error("Gagal menghapus siswa:", error);
+      return false;
+    }
+  }, []);
+
+  const addClass = useCallback(async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    try {
+      const created = await fetchJSON<ClassGroup>("/api/classes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      setClasses((prev) => sortByName([...prev, created]));
+      return created;
+    } catch (error) {
+      console.error("Gagal menambahkan kelas:", error);
+      return null;
+    }
+  }, []);
+
+  const updateClass = useCallback(async (id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new Error("Nama kelas wajib diisi.");
+    }
+    try {
+      const updated = await fetchJSON<ClassGroup>(`/api/classes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      setClasses((prev) =>
+        sortByName(
+          prev.map((classItem) => (classItem.id === id ? updated : classItem))
+        )
+      );
+      setStudents((prev) =>
+        prev.map((student) =>
+          student.classId === id
+            ? { ...student, className: updated.name }
+            : student
+        )
+      );
+      return updated;
+    } catch (error) {
+      console.error("Gagal memperbarui kelas:", error);
+      if (error instanceof Error && error.message.trim().length) {
+        throw error;
+      }
+      throw new Error("Gagal memperbarui kelas. Coba lagi nanti.");
+    }
+  }, []);
+
+  const removeClass = useCallback(async (id: string) => {
+    try {
+      await fetchJSON(`/api/classes/${id}`, {
+        method: "DELETE",
+      });
+      setClasses((prev) => prev.filter((classItem) => classItem.id !== id));
+      setStudents((prev) =>
+        prev.filter((student) => student.classId !== id)
+      );
+      return true;
+    } catch (error) {
+      console.error("Gagal menghapus kelas:", error);
+      return false;
+    }
+  }, []);
 
   const value = useMemo<StudentContextValue>(
     () => ({
       students,
       classes,
       hydrated,
-      addStudent: ({ name, className }) => {
-        setStudents((prev) => [
-          ...prev,
-          {
-            id: `STD-${(prev.length + 1).toString().padStart(3, "0")}`,
-            name,
-            className,
-          },
-        ]);
-      },
-      updateStudent: (id, updates) => {
-        setStudents((prev) =>
-          prev.map((student) =>
-            student.id === id ? { ...student, ...updates } : student
-          )
-        );
-      },
-      removeStudent: (id) => {
-        setStudents((prev) => prev.filter((student) => student.id !== id));
-      },
-      getStudentById: (id) => students.find((student) => student.id === id),
-      addClass: (name) => {
-        const trimmed = name.trim();
-        if (!trimmed) return null;
-        const exists = classes.some(
-          (classItem) =>
-            classItem.name.toLocaleLowerCase("id-ID") ===
-            trimmed.toLocaleLowerCase("id-ID")
-        );
-        if (exists) {
-          return classes.find(
-            (classItem) =>
-              classItem.name.toLocaleLowerCase("id-ID") ===
-              trimmed.toLocaleLowerCase("id-ID")
-          )!;
-        }
-        const newClass: ClassGroup = {
-          id: `CLS-${(classes.length + 1).toString().padStart(3, "0")}`,
-          name: trimmed,
-        };
-        setClasses((prev) => [...prev, newClass]);
-        return newClass;
-      },
-      updateClass: (id, name) => {
-        const trimmed = name.trim();
-        if (!trimmed) return;
-        setClasses((prevClasses) => {
-          const target = prevClasses.find((classItem) => classItem.id === id);
-          if (!target) return prevClasses;
-          if (target.name === trimmed) return prevClasses;
-          setStudents((prevStudents) =>
-            prevStudents.map((student) =>
-              student.className === target.name
-                ? { ...student, className: trimmed }
-                : student
-            )
-          );
-          return prevClasses.map((classItem) =>
-            classItem.id === id ? { ...classItem, name: trimmed } : classItem
-          );
-        });
-      },
-      removeClass: (id) => {
-        const target = classes.find((classItem) => classItem.id === id);
-        if (!target) return false;
-        const inUse = students.some(
-          (student) =>
-            student.className.toLocaleLowerCase("id-ID") ===
-            target.name.toLocaleLowerCase("id-ID")
-        );
-        if (inUse) {
-          return false;
-        }
-        setClasses((prevClasses) =>
-          prevClasses.filter((classItem) => classItem.id !== id)
-        );
-        return true;
-      },
+      loading,
+      addStudent,
+      updateStudent,
+      removeStudent,
+      getStudentById: (id: string) =>
+        students.find((student) => student.id === id),
+      addClass,
+      updateClass,
+      removeClass,
+      refresh,
     }),
-    [students, classes, hydrated]
+    [
+      students,
+      classes,
+      hydrated,
+      loading,
+      addStudent,
+      updateStudent,
+      removeStudent,
+      addClass,
+      updateClass,
+      removeClass,
+      refresh,
+    ]
   );
 
   return (

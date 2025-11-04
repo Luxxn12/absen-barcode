@@ -9,6 +9,7 @@ import {
   QrCode,
   X,
   Settings2,
+  Loader2,
 } from "lucide-react";
 import { Student, useStudents } from "@/contexts/StudentContext";
 
@@ -22,6 +23,7 @@ export default function GuruSiswaPage() {
     addClass,
     updateClass,
     removeClass,
+    loading,
   } = useStudents();
   const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -36,6 +38,17 @@ export default function GuruSiswaPage() {
   const [newClassName, setNewClassName] = useState("");
   const [classDrafts, setClassDrafts] = useState<Record<string, string>>({});
   const [classError, setClassError] = useState("");
+  const [studentError, setStudentError] = useState("");
+  const [isSavingStudent, setIsSavingStudent] = useState(false);
+  const [deletingStudentId, setDeletingStudentId] = useState<string | null>(
+    null
+  );
+  const [creatingClass, setCreatingClass] = useState(false);
+  const [savingClassId, setSavingClassId] = useState<string | null>(null);
+  const [deletingClassId, setDeletingClassId] = useState<string | null>(null);
+  const classActionInProgress = Boolean(
+    creatingClass || savingClassId || deletingClassId
+  );
 
   const ITEMS_PER_PAGE = 10;
 
@@ -69,44 +82,69 @@ export default function GuruSiswaPage() {
   const totalFiltered = filteredStudents.length;
 
   const openAddModal = () => {
+    if (loading && classes.length === 0) return;
     setEditingStudent(null);
     setFormState({
       name: "",
       classId: classes[0]?.id ?? "",
     });
+    setStudentError("");
     setIsFormOpen(true);
   };
 
   const openEditModal = (student: Student) => {
     setEditingStudent(student);
-    const existingClass =
-      classes.find((classItem) => classItem.name === student.className) ??
-      addClass(student.className);
     setFormState({
       name: student.name,
-      classId: existingClass?.id ?? "",
+      classId: student.classId ?? "",
     });
+    setStudentError("");
     setIsFormOpen(true);
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSavingStudent) return;
+    setStudentError("");
     const selectedClass = classes.find(
       (classItem) => classItem.id === formState.classId
     );
     if (!selectedClass) return;
-    if (editingStudent) {
-      updateStudent(editingStudent.id, {
-        name: formState.name,
-        className: selectedClass.name,
+    setIsSavingStudent(true);
+    try {
+      const result = editingStudent
+        ? await updateStudent(editingStudent.id, {
+            name: formState.name,
+            classId: selectedClass.id,
+          })
+        : await addStudent({
+            name: formState.name,
+            classId: selectedClass.id,
+          });
+
+      if (!result) {
+        setStudentError(
+          editingStudent
+            ? "Perubahan siswa gagal disimpan. Coba lagi."
+            : "Data siswa gagal ditambahkan. Coba lagi."
+        );
+        return;
+      }
+
+      setIsFormOpen(false);
+      setEditingStudent(null);
+      setFormState({
+        name: "",
+        classId: classes[0]?.id ?? selectedClass.id ?? "",
       });
-    } else {
-      addStudent({
-        name: formState.name,
-        className: selectedClass.name,
-      });
+    } catch (error) {
+      console.error(error);
+      setStudentError(
+        "Data siswa gagal disimpan. Mohon coba lagi dalam beberapa saat."
+      );
+    } finally {
+      setIsSavingStudent(false);
     }
-    setIsFormOpen(false);
   };
 
   return (
@@ -123,6 +161,7 @@ export default function GuruSiswaPage() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
+              disabled={loading}
               onClick={() => {
                 setClassDrafts(
                   classes.reduce<Record<string, string>>((acc, item) => {
@@ -134,14 +173,15 @@ export default function GuruSiswaPage() {
                 setClassError("");
                 setIsClassManagerOpen(true);
               }}
-              className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-5 py-3 text-sm font-semibold text-indigo-600 shadow-md shadow-indigo-500/10 transition hover:border-indigo-200 hover:bg-indigo-100"
+              className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-5 py-3 text-sm font-semibold text-indigo-600 shadow-md shadow-indigo-500/10 transition hover:border-indigo-200 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Settings2 className="h-4 w-4" />
               Kelola Kelas
             </button>
             <button
+              disabled={loading || classes.length === 0}
               onClick={openAddModal}
-              className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700"
+              className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
             >
               <Plus className="h-4 w-4" />
               Tambah Siswa
@@ -163,7 +203,14 @@ export default function GuruSiswaPage() {
             />
           </div>
           <p className="text-xs text-slate-400">
-            Total siswa ditampilkan: <strong>{totalFiltered}</strong>
+            {loading
+              ? "Memuat data siswa..."
+              : (
+                  <>
+                    Total siswa ditampilkan:{" "}
+                    <strong>{totalFiltered}</strong>
+                  </>
+                )}
           </p>
         </div>
 
@@ -297,8 +344,13 @@ export default function GuruSiswaPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm sm:items-center">
           <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
             <button
-              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-              onClick={() => setIsFormOpen(false)}
+              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => {
+                if (isSavingStudent) return;
+                setIsFormOpen(false);
+                setStudentError("");
+              }}
+              disabled={isSavingStudent}
             >
               <X className="h-4 w-4" />
             </button>
@@ -375,19 +427,38 @@ export default function GuruSiswaPage() {
                 )}
               </div>
 
+              {studentError && (
+                <p className="text-xs text-rose-500">{studentError}</p>
+              )}
+
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setIsFormOpen(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                  onClick={() => {
+                    if (isSavingStudent) return;
+                    setIsFormOpen(false);
+                    setStudentError("");
+                  }}
+                  disabled={isSavingStudent}
+                  className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-700"
+                  disabled={isSavingStudent}
+                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
                 >
-                  {editingStudent ? "Simpan Perubahan" : "Simpan Data"}
+                  {isSavingStudent ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {editingStudent ? "Menyimpan..." : "Menambah..."}
+                    </>
+                  ) : editingStudent ? (
+                    "Simpan Perubahan"
+                  ) : (
+                    "Simpan Data"
+                  )}
                 </button>
               </div>
             </form>
@@ -399,12 +470,14 @@ export default function GuruSiswaPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm sm:items-center">
           <div className="relative w-full max-w-xl rounded-3xl bg-white p-6 shadow-xl">
             <button
-              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={() => {
+                if (classActionInProgress) return;
                 setIsClassManagerOpen(false);
                 setClassError("");
                 setNewClassName("");
               }}
+              disabled={classActionInProgress}
             >
               <X className="h-4 w-4" />
             </button>
@@ -424,26 +497,32 @@ export default function GuruSiswaPage() {
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <input
                     value={newClassName}
-                    onChange={(event) => setNewClassName(event.target.value)}
+                    onChange={(event) => {
+                      setNewClassName(event.target.value);
+                      setClassError("");
+                    }}
                     placeholder="contoh: XII IPA 3"
                     className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const trimmed = newClassName.trim();
-                      if (!trimmed) return;
-                      const exists = classes.some(
-                        (classItem) =>
-                          classItem.name.toLocaleLowerCase("id-ID") ===
-                          trimmed.toLocaleLowerCase("id-ID")
-                      );
-                      if (exists) {
-                        setClassError("Kelas sudah terdaftar.");
-                        setNewClassName("");
-                        return;
-                      }
-                      const created = addClass(trimmed);
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (creatingClass) return;
+                    const trimmed = newClassName.trim();
+                    if (!trimmed) return;
+                    const exists = classes.some(
+                      (classItem) =>
+                        classItem.name.toLocaleLowerCase("id-ID") ===
+                        trimmed.toLocaleLowerCase("id-ID")
+                    );
+                    if (exists) {
+                      setClassError("Kelas sudah terdaftar.");
+                      setNewClassName("");
+                      return;
+                    }
+                    setCreatingClass(true);
+                    try {
+                      const created = await addClass(trimmed);
                       if (created) {
                         setClassDrafts((prev) => ({
                           ...prev,
@@ -462,14 +541,24 @@ export default function GuruSiswaPage() {
                           "Kelas baru gagal ditambahkan. Coba lagi nanti."
                         );
                       }
-                    }}
-                    disabled={!newClassName.trim()}
-                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
-                  >
-                    Tambah Kelas
-                  </button>
-                </div>
+                    } finally {
+                      setCreatingClass(false);
+                    }
+                  }}
+                  disabled={creatingClass || !newClassName.trim()}
+                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                >
+                  {creatingClass ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Menambah...
+                    </>
+                  ) : (
+                    "Tambah Kelas"
+                  )}
+                </button>
               </div>
+            </div>
 
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-widest text-slate-500">
@@ -492,10 +581,13 @@ export default function GuruSiswaPage() {
                               classDrafts[classItem.id] ?? classItem.name ?? ""
                             }
                             onChange={(event) =>
-                              setClassDrafts((prev) => ({
-                                ...prev,
-                                [classItem.id]: event.target.value,
-                              }))
+                              setClassDrafts((prev) => {
+                                setClassError("");
+                                return {
+                                  ...prev,
+                                  [classItem.id]: event.target.value,
+                                };
+                              })
                             }
                             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none ring-indigo-500 focus:border-indigo-500 focus:ring-2"
                           />
@@ -503,53 +595,112 @@ export default function GuruSiswaPage() {
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
                           <button
                             type="button"
-                            onClick={() => {
-                              const draftName =
-                                classDrafts[classItem.id]?.trim() ??
-                                classItem.name;
-                              updateClass(classItem.id, draftName);
-                              setClassDrafts((prev) => ({
-                                ...prev,
-                                [classItem.id]: draftName,
-                              }));
-                              setClassError("");
+                            onClick={async () => {
+                              if (savingClassId === classItem.id) return;
+                              const rawDraft =
+                                classDrafts[classItem.id] ?? classItem.name;
+                              const trimmedDraft = rawDraft.trim();
+                              if (!trimmedDraft) {
+                                setClassError("Nama kelas wajib diisi.");
+                                setClassDrafts((prev) => ({
+                                  ...prev,
+                                  [classItem.id]: classItem.name,
+                                }));
+                                return;
+                              }
+                              if (trimmedDraft === classItem.name) {
+                                setClassError("");
+                                return;
+                              }
+                              setSavingClassId(classItem.id);
+                              try {
+                                const updated = await updateClass(
+                                  classItem.id,
+                                  trimmedDraft
+                                );
+                                setClassDrafts((prev) => ({
+                                  ...prev,
+                                  [classItem.id]: updated.name,
+                                }));
+                                setClassError("");
+                              } catch (error) {
+                                setClassDrafts((prev) => ({
+                                  ...prev,
+                                  [classItem.id]: classItem.name,
+                                }));
+                                setClassError(
+                                  error instanceof Error && error.message
+                                    ? error.message
+                                    : "Nama kelas gagal disimpan. Coba lagi."
+                                );
+                              } finally {
+                                setSavingClassId(null);
+                              }
                             }}
-                            className="inline-flex items-center justify-center rounded-full bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-100"
+                            disabled={
+                              savingClassId === classItem.id ||
+                              deletingClassId === classItem.id
+                            }
+                            className="inline-flex items-center justify-center rounded-full bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            Simpan Nama
+                            {savingClassId === classItem.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                Menyimpan...
+                              </>
+                            ) : (
+                              "Simpan Nama"
+                            )}
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              const remaining = classes.filter(
-                                (item) => item.id !== classItem.id
-                              );
-                              const success = removeClass(classItem.id);
-                              if (!success) {
-                                setClassError(
-                                  "Kelas tidak dapat dihapus karena masih digunakan oleh siswa."
-                                );
-                                return;
-                              }
-                              setClassError("");
-                              setClassDrafts((prev) => {
-                                const nextDrafts = { ...prev };
-                                delete nextDrafts[classItem.id];
-                                return nextDrafts;
-                              });
-                              setFormState((prev) => {
-                                if (prev.classId === classItem.id) {
-                                  return {
-                                    ...prev,
-                                    classId: remaining[0]?.id ?? "",
-                                  };
+                            onClick={async () => {
+                              if (deletingClassId === classItem.id) return;
+                              setDeletingClassId(classItem.id);
+                              try {
+                                const success = await removeClass(classItem.id);
+                                if (!success) {
+                                  setClassError(
+                                    "Kelas tidak dapat dihapus karena masih digunakan oleh siswa."
+                                  );
+                                  return;
                                 }
-                                return prev;
-                              });
+                                setClassError("");
+                                const remaining = classes.filter(
+                                  (item) => item.id !== classItem.id
+                                );
+                                setClassDrafts((prev) => {
+                                  const nextDrafts = { ...prev };
+                                  delete nextDrafts[classItem.id];
+                                  return nextDrafts;
+                                });
+                                setFormState((prev) => {
+                                  if (prev.classId === classItem.id) {
+                                    return {
+                                      ...prev,
+                                      classId: remaining[0]?.id ?? "",
+                                    };
+                                  }
+                                  return prev;
+                                });
+                              } finally {
+                                setDeletingClassId(null);
+                              }
                             }}
-                            className="inline-flex items-center justify-center rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-500 transition hover:bg-rose-50"
+                            disabled={
+                              savingClassId === classItem.id ||
+                              deletingClassId === classItem.id
+                            }
+                            className="inline-flex items-center justify-center rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-500 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            Hapus
+                            {deletingClassId === classItem.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                Menghapus...
+                              </>
+                            ) : (
+                              "Hapus"
+                            )}
                           </button>
                         </div>
                       </div>
@@ -566,11 +717,13 @@ export default function GuruSiswaPage() {
               <button
                 type="button"
                 onClick={() => {
+                  if (classActionInProgress) return;
                   setIsClassManagerOpen(false);
                   setClassError("");
                   setNewClassName("");
                 }}
-                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                disabled={classActionInProgress}
+                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Selesai
               </button>
@@ -589,24 +742,45 @@ export default function GuruSiswaPage() {
               Hapus Data Siswa?
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Data {confirmDelete.name} akan dihapus dari perangkat ini. Tindakan
-              ini tidak dapat dibatalkan.
+              Data {confirmDelete.name} akan dihapus dari basis data. Tindakan ini
+              tidak dapat dibatalkan.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <button
-                onClick={() => setConfirmDelete(null)}
-                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                onClick={() => {
+                  if (deletingStudentId) return;
+                  setConfirmDelete(null);
+                }}
+                disabled={Boolean(deletingStudentId)}
+                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Batalkan
               </button>
               <button
-                onClick={() => {
-                  removeStudent(confirmDelete.id);
-                  setConfirmDelete(null);
+                onClick={async () => {
+                  if (!confirmDelete) return;
+                  if (deletingStudentId) return;
+                  setDeletingStudentId(confirmDelete.id);
+                  try {
+                    const success = await removeStudent(confirmDelete.id);
+                    if (success) {
+                      setConfirmDelete(null);
+                    }
+                  } finally {
+                    setDeletingStudentId(null);
+                  }
                 }}
-                className="rounded-xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-400/30 transition hover:bg-rose-600"
+                disabled={Boolean(deletingStudentId)}
+                className="rounded-xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-400/30 transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:bg-rose-300"
               >
-                Ya, Hapus
+                {deletingStudentId ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Menghapus...
+                  </>
+                ) : (
+                  "Ya, Hapus"
+                )}
               </button>
             </div>
           </div>
