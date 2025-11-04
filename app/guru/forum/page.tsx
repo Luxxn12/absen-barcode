@@ -307,8 +307,9 @@ export default function GuruForumPage() {
                   minute: "2-digit",
                 }
               );
-              const className =
-                classSummaries.get(item.classId) ?? item.className;
+              const className = item.classId
+                ? classSummaries.get(item.classId) ?? item.className
+                : item.className;
               return (
                 <article
                   key={item.id}
