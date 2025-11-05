@@ -8,17 +8,14 @@ import { useStudents } from "@/contexts/StudentContext";
 
 type RoleTab = "guru" | "siswa";
 
-const guruCredentials = {
-  email: "guru@sekolah.id",
-  password: "12345",
-};
+const defaultGuruEmail = "guru@sekolah.id";
 
 export default function LoginPage() {
   const router = useRouter();
   const { session, hydrated: authHydrated, loginGuru } = useAuth();
   const { hydrated: studentHydrated } = useStudents();
   const [activeTab, setActiveTab] = useState<RoleTab>("guru");
-  const [email, setEmail] = useState(guruCredentials.email);
+  const [email, setEmail] = useState(defaultGuruEmail);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const isReady = authHydrated && studentHydrated;
@@ -39,7 +36,7 @@ export default function LoginPage() {
     if (activeTab === "guru") {
       const success = await loginGuru(email, password);
       if (!success) {
-        setError("Email atau password salah. Gunakan kredensial dummy di atas.");
+        setError("Email atau password salah.");
         return;
       }
       router.replace("/guru/dashboard");
@@ -111,9 +108,6 @@ export default function LoginPage() {
                   autoComplete="email"
                   disabled={!isReady}
                 />
-                <p className="mt-1 text-xs text-slate-400">
-                  Dummy login: guru@sekolah.id / 12345
-                </p>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-600">

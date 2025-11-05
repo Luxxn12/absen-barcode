@@ -3,6 +3,7 @@ import {
   AttendanceStatus,
   ForumMood,
 } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -155,6 +156,7 @@ const announcements = [
 ];
 
 async function main() {
+  await prisma.user.deleteMany();
   await prisma.attendanceRecord.deleteMany();
   await prisma.forumEntry.deleteMany();
   await prisma.student.deleteMany();
@@ -221,6 +223,15 @@ async function main() {
         updatedAt: new Date(Date.now() - 1000 * 60 * 90),
       },
     ],
+  });
+
+  const passwordHash = await bcrypt.hash("12345", 10);
+  await prisma.user.create({
+    data: {
+      email: "guru@sekolah.id".toLowerCase(),
+      passwordHash,
+      name: "Bu Guru Admin",
+    },
   });
 }
 

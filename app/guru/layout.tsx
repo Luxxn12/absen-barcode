@@ -44,6 +44,19 @@ export default function GuruLayout({
   const router = useRouter();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const guruName =
+    session?.role === "guru" ? session.name : "Guru / Admin";
+  const guruEmail =
+    session?.role === "guru" ? session.email : "guru@example.com";
+  const guruInitials =
+    session?.role === "guru"
+      ? session.name
+          .split(" ")
+          .map((part) => part.charAt(0))
+          .join("")
+          .slice(0, 2)
+          .toUpperCase()
+      : "GA";
 
   useEffect(() => {
     if (!hydrated) return;
@@ -162,9 +175,9 @@ export default function GuruLayout({
           <div ref={profileRef} className="relative flex items-center gap-3">
             <div className="hidden flex-col text-right text-xs text-slate-500 sm:flex">
               <span className="font-medium text-slate-700">
-                {session?.role === "guru" ? "Bu Guru Admin" : ""}
+                {guruName}
               </span>
-              <span>guru@sekolah.id</span>
+              <span>{guruEmail}</span>
             </div>
             <button
               type="button"
@@ -173,10 +186,10 @@ export default function GuruLayout({
               aria-haspopup="true"
               aria-expanded={isProfileMenuOpen}
             >
-              GA
+              {guruInitials || "GA"}
             </button>
             <span className="hidden h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white md:flex">
-              GA
+              {guruInitials || "GA"}
             </span>
             {isProfileMenuOpen && (
               <div className="absolute right-0 top-12 z-40 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-xl md:hidden">
