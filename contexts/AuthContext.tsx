@@ -2,9 +2,11 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
+import { fetchJSON } from "@/lib/fetchJSON";
 
 type GuruSession = {
   role: "guru";
+  id: string;
   email: string;
   name: string;
 };
@@ -28,6 +30,48 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const STORAGE_KEY = "absen-barcode-session";
 
+function normalizeSession(raw: unknown): Session {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const value = raw as Record<string, unknown>;
+  if (value.role === "guru") {
+    const id = value.id;
+    const email = value.email;
+    const name = value.name;
+    if (
+      typeof id === "string" &&
+      id.trim().length &&
+      typeof email === "string" &&
+      email.trim().length &&
+      typeof name === "string" &&
+      name.trim().length
+    ) {
+      return {
+        role: "guru",
+        id: id.trim(),
+        email: email.trim(),
+        name: name.trim(),
+      };
+    }
+    return null;
+  }
+
+  if (value.role === "siswa") {
+    const studentId = value.studentId;
+    if (typeof studentId === "string" && studentId.trim().length) {
+      return {
+        role: "siswa",
+        studentId: studentId.trim(),
+      };
+    }
+    return null;
+  }
+
+  return null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isClient = typeof window !== "undefined";
   const hydrated = useHydrated();
@@ -36,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     try {
-      return JSON.parse(stored) as Session;
+      return normalizeSession(JSON.parse(stored));
     } catch {
       return null;
     }
@@ -55,20 +99,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       hydrated,
       loginGuru: async (email, password) => {
-        const validEmail = "guru@sekolah.id";
-        const validPassword = "12345";
-        const isValid =
-          email.trim().toLowerCase() === validEmail &&
-          password.trim() === validPassword;
+        const trimmedEmail = email.trim().toLowerCase();
+        const trimmedPassword = password.trim();
+        if (!trimmedEmail || !trimmedPassword) {
+          return false;
+        }
 
-        if (isValid) {
+        try {
+          const user = await fetchJSON<{
+            id: string;
+            email: string;
+            name: string;
+          }>("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: trimmedEmail,
+              password: trimmedPassword,
+            }),
+          });
           setSession({
             role: "guru",
-            email: validEmail,
-            name: "Bu Guru Admin",
+            id: user.id,
+            email: user.email,
+            name: user.name,
           });
+          return true;
+        } catch (error) {
+          console.error("Login guru gagal:", error);
+          return false;
         }
-        return isValid;
       },
       loginSiswa: (studentId) => {
         setSession({
