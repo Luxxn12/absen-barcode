@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { prisma as globalPrisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -34,28 +34,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const userModel = (db as unknown as {
+    const userDelegate = (db as unknown as {
       user?: {
         findUnique?: (args: { where: { email: string } }) => Promise<UserRecord | null>;
       };
     }).user;
 
-    let user: UserRecord | null = null;
-
-    if (userModel?.findUnique) {
-      user = await userModel.findUnique({
-        where: { email: emailInput },
-      });
-    } else {
-      user = await db
-        .$queryRaw<UserRecord[]>(Prisma.sql`
-          SELECT "id", "email", "passwordHash", "name"
-          FROM "User"
-          WHERE "email" = ${emailInput}
-          LIMIT 1
-        `)
-        .then((rows) => rows.at(0) ?? null);
+    if (!userDelegate?.findUnique) {
+      console.error(
+        "[auth][login] Prisma client tidak memiliki delegate `user`. Pastikan prisma generate sudah dijalankan."
+      );
+      return NextResponse.json(
+        {
+          error: "Konfigurasi server belum siap. Coba lagi nanti.",
+          details: "Delegate `user` tidak tersedia.",
+        },
+        { status: 500 }
+      );
     }
+
+    const user = await userDelegate.findUnique({
+      where: { email: emailInput },
+    });
 
     if (!user) {
       return NextResponse.json(
