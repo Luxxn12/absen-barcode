@@ -28,29 +28,41 @@ export async function POST(request: Request) {
     }
 
     const userModel = (db as PrismaClient & {
-      user?: { findUnique?: PrismaClient["user"]["findUnique"] };
+      user?: {
+        findUnique?: (
+          args: Prisma.UserFindUniqueArgs
+        ) => Promise<{
+          id: string;
+          email: string;
+          passwordHash: string;
+          name: string;
+        } | null>;
+      };
     }).user;
 
-    const user =
-      typeof userModel?.findUnique === "function"
-        ? await userModel.findUnique({
-            where: { email: emailInput },
-          })
-        : await db
-            .$queryRaw<
-              Array<{
-                id: string;
-                email: string;
-                passwordHash: string;
-                name: string;
-              }>
-            >(Prisma.sql`
-              SELECT "id", "email", "passwordHash", "name"
-              FROM "User"
-              WHERE "email" = ${emailInput}
-              LIMIT 1
-            `)
-            .then((rows) => rows.at(0) ?? null);
+    type UserRecord = {
+      id: string;
+      email: string;
+      passwordHash: string;
+      name: string;
+    };
+
+    let user: UserRecord | null = null;
+
+    if (userModel?.findUnique) {
+      user = await userModel.findUnique({
+        where: { email: emailInput },
+      });
+    } else {
+      user = await db
+        .$queryRaw<UserRecord[]>(Prisma.sql`
+          SELECT "id", "email", "passwordHash", "name"
+          FROM "User"
+          WHERE "email" = ${emailInput}
+          LIMIT 1
+        `)
+        .then((rows) => rows.at(0) ?? null);
+    }
 
     if (!user) {
       return NextResponse.json(
