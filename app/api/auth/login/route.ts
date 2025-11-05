@@ -10,6 +10,13 @@ type LoginPayload = {
   password?: unknown;
 };
 
+type UserRecord = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+};
+
 export async function POST(request: Request) {
   const db = globalPrisma ?? new PrismaClient();
 
@@ -27,25 +34,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const userModel = (db as PrismaClient & {
+    const userModel = (db as unknown as {
       user?: {
-        findUnique?: (
-          args: Prisma.UserFindUniqueArgs
-        ) => Promise<{
-          id: string;
-          email: string;
-          passwordHash: string;
-          name: string;
-        } | null>;
+        findUnique?: (args: { where: { email: string } }) => Promise<UserRecord | null>;
       };
     }).user;
-
-    type UserRecord = {
-      id: string;
-      email: string;
-      passwordHash: string;
-      name: string;
-    };
 
     let user: UserRecord | null = null;
 
