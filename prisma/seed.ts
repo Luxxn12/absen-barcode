@@ -3,8 +3,6 @@ import {
   AttendanceStatus,
   ForumMood,
 } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import { randomUUID } from "crypto";
 
 const prisma = new PrismaClient();
 
@@ -157,24 +155,6 @@ const announcements = [
 ];
 
 async function main() {
-  type UserDelegate = {
-    deleteMany: () => Promise<unknown>;
-    create: (args: {
-      data: {
-        email: string;
-        passwordHash: string;
-        name: string;
-      };
-    }) => Promise<unknown>;
-  };
-
-  const userDelegate = (prisma as unknown as { user?: UserDelegate }).user;
-
-  if (userDelegate?.deleteMany) {
-    await userDelegate.deleteMany();
-  } else {
-    await prisma.$executeRaw`DELETE FROM "User"`;
-  }
   await prisma.attendanceRecord.deleteMany();
   await prisma.forumEntry.deleteMany();
   await prisma.student.deleteMany();
@@ -242,26 +222,6 @@ async function main() {
       },
     ],
   });
-
-  const passwordHash = await bcrypt.hash("12345", 10);
-  const adminEmail = "guru@sekolah.id".toLowerCase();
-  const adminName = "Bu Guru Admin";
-  if (userDelegate?.create) {
-    await userDelegate.create({
-      data: {
-        email: adminEmail,
-        passwordHash,
-        name: adminName,
-      },
-    });
-  } else {
-    const id = randomUUID();
-    const now = new Date();
-    await prisma.$executeRaw`
-      INSERT INTO "User" ("id", "email", "passwordHash", "name", "createdAt", "updatedAt")
-      VALUES (${id}, ${adminEmail}, ${passwordHash}, ${adminName}, ${now}, ${now})
-    `;
-  }
 }
 
 main()
