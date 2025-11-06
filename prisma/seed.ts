@@ -4,7 +4,13 @@ import {
   ForumMood,
 } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DIRECT_URL ?? process.env.DATABASE_URL,
+    },
+  },
+});
 
 const classGroups = [
   { id: "CLS-001", name: "X IPA 1" },
