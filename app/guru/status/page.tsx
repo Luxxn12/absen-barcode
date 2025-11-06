@@ -29,12 +29,17 @@ const statusColors: Record<
 };
 
 export default function GuruStatusPage() {
-  const { students } = useStudents();
+  const {
+    students,
+    loading: studentsLoading,
+    hydrated: studentsHydrated,
+  } = useStudents();
   const {
     getAvailableDates,
     getRecordsByDate,
     updateAttendance,
     loading,
+    hydrated: attendanceHydrated,
   } = useAttendance();
 
   const fallbackDate = useMemo(() => getDateKey(new Date()), []);
@@ -130,6 +135,15 @@ export default function GuruStatusPage() {
   const totalStudents = students.length;
   const totalDisplayed = rows.length;
   const tanpaKeterangan = summary.Alfa + summary.BelumAbsen;
+  const isLoading =
+    !studentsHydrated ||
+    !attendanceHydrated ||
+    studentsLoading ||
+    loading;
+
+  if (isLoading) {
+    return <StatusSkeleton />;
+  }
 
   const handleStatusDraft = (
     studentId: string,
@@ -470,4 +484,59 @@ function getCurrentTime() {
       hour12: false,
     })
     .slice(0, 5);
+}
+
+function StatusSkeleton() {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-3xl bg-white p-6 shadow-lg shadow-slate-200/40">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+            <div className="h-6 w-64 animate-pulse rounded bg-slate-200" />
+            <div className="h-3 w-48 animate-pulse rounded bg-slate-200" />
+          </div>
+          <div className="h-8 w-40 animate-pulse rounded-full bg-slate-200" />
+        </div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={`summary-skel-${index}`}
+              className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm"
+            >
+              <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+              <div className="mt-3 h-7 w-20 animate-pulse rounded bg-slate-200" />
+              <div className="mt-4 h-6 w-28 animate-pulse rounded-full bg-slate-200" />
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="h-12 w-full animate-pulse rounded-2xl bg-slate-200 sm:w-48" />
+            <div className="h-12 w-full animate-pulse rounded-2xl bg-slate-200 sm:w-64" />
+          </div>
+          <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+        </div>
+
+        <div className="mt-6 space-y-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={`row-skel-${index}`}
+              className="grid gap-3 rounded-3xl border border-slate-100 bg-white px-6 py-4 shadow-sm sm:grid-cols-[2fr,1fr,1fr,1fr]"
+            >
+              <div className="space-y-2">
+                <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+                <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
+              </div>
+              <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
+              <div className="h-6 w-28 animate-pulse rounded-full bg-slate-200" />
+              <div className="h-10 w-full animate-pulse rounded-full bg-slate-200 sm:w-40" />
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
 }
