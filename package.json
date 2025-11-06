@@ -7,16 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy",
-    "prisma:seed": "prisma db seed"
+    "ensure:guru": "tsx --tsconfig tsconfig.json scripts/ensureGuruUser.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.18.0",
+    "@supabase/supabase-js": "^2.79.0",
+    "bcryptjs": "^2.4.3",
     "lucide-react": "^0.548.0",
     "next": "16.0.0",
-    "prisma": "^6.18.0",
     "qrcode.react": "^4.2.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -27,8 +24,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/bcryptjs": "^2.4.4",
     "eslint": "^9",
     "eslint-config-next": "16.0.0",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.14.1",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5"

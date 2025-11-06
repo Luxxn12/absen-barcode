@@ -8,14 +8,13 @@ import { useStudents } from "@/contexts/StudentContext";
 
 type RoleTab = "guru" | "siswa";
 
-const defaultGuruEmail = "guru@sekolah.id";
 
 export default function LoginPage() {
   const router = useRouter();
   const { session, hydrated: authHydrated, loginGuru } = useAuth();
   const { hydrated: studentHydrated } = useStudents();
   const [activeTab, setActiveTab] = useState<RoleTab>("guru");
-  const [email, setEmail] = useState(defaultGuruEmail);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const isReady = authHydrated && studentHydrated;

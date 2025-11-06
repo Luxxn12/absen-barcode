@@ -9,19 +9,16 @@ import {
   useState,
 } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
-import { fetchJSON } from "@/lib/fetchJSON";
+import {
+  listAttendanceAction,
+  upsertAttendanceAction,
+  type AttendanceRecord as ServerAttendanceRecord,
+  type AttendanceStatus as ServerAttendanceStatus,
+} from "@/app/actions/attendance";
 
-export type AttendanceStatus = "Hadir" | "Sakit" | "Izin" | "Alfa";
+export type AttendanceStatus = ServerAttendanceStatus;
 
-export type AttendanceRecord = {
-  id: string;
-  studentId: string;
-  date: string;
-  status: AttendanceStatus;
-  checkIn: string;
-  createdAt: string;
-  updatedAt: string;
-};
+export type AttendanceRecord = ServerAttendanceRecord;
 
 type AttendanceContextValue = {
   records: AttendanceRecord[];
@@ -69,7 +66,7 @@ export function AttendanceProvider({
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchJSON<AttendanceRecord[]>("/api/attendance");
+      const data = await listAttendanceAction();
       setRecords(sortRecords(data));
     } catch (error) {
       console.error("Gagal memuat data kehadiran:", error);
@@ -91,16 +88,11 @@ export function AttendanceProvider({
       options?: { date?: string }
     ) => {
       try {
-        const payload = {
+        const record = await upsertAttendanceAction({
           studentId,
           status,
           checkIn,
           date: options?.date,
-        };
-        const record = await fetchJSON<AttendanceRecord>("/api/attendance", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
         });
         setRecords((prev) => {
           const index = prev.findIndex(
@@ -162,4 +154,3 @@ export function useAttendance() {
   }
   return context;
 }
-

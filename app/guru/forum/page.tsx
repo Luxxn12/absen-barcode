@@ -12,20 +12,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStudents } from "@/contexts/StudentContext";
-import { fetchJSON } from "@/lib/fetchJSON";
+import {
+  listForumEntriesAction,
+  createForumEntryAction,
+  deleteForumEntryAction,
+  type ForumMood,
+  type ForumEntryRecord,
+} from "@/app/actions/forum";
 
-type ForumMood = "Senang" | "Netral" | "Sedih" | "PerluPerhatian";
-
-type ForumEntry = {
-  id: string;
-  studentId: string;
-  studentName: string;
-  classId: string | null;
-  className: string;
-  mood: ForumMood;
-  message: string;
-  createdAt: string;
-};
+type ForumEntry = ForumEntryRecord;
 
 const moodOptions: Array<{ value: ForumMood; label: string }> = [
   { value: "Senang", label: "Senang" },
@@ -66,7 +61,7 @@ export default function GuruForumPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await fetchJSON<ForumEntry[]>("/api/forum");
+        const data = await listForumEntriesAction();
         setEntries(data);
       } catch (err) {
         console.error(err);
@@ -114,14 +109,10 @@ export default function GuruForumPage() {
     }
     setSubmitting(true);
     try {
-      const created = await fetchJSON<ForumEntry>("/api/forum", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studentId: selectedStudentId,
-          mood,
-          message,
-        }),
+      const created = await createForumEntryAction({
+        studentId: selectedStudentId,
+        mood,
+        message,
       });
       setEntries((prev) => [created, ...prev]);
       setMessage("");
@@ -139,7 +130,7 @@ export default function GuruForumPage() {
   const handleDelete = async (id: string) => {
     setDeleteError("");
     try {
-      await fetchJSON(`/api/forum/${id}`, { method: "DELETE" });
+      await deleteForumEntryAction(id);
       setEntries((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       console.error(err);

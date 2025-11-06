@@ -9,15 +9,14 @@ import {
   useState,
 } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
-import { fetchJSON } from "@/lib/fetchJSON";
+import {
+  listAnnouncementsAction,
+  createAnnouncementAction,
+  deleteAnnouncementAction,
+  type AnnouncementRecord,
+} from "@/app/actions/announcements";
 
-export type Announcement = {
-  id: string;
-  time: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-};
+export type Announcement = AnnouncementRecord;
 
 type AnnouncementContextValue = {
   announcements: Announcement[];
@@ -48,7 +47,7 @@ export function AnnouncementProvider({
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchJSON<Announcement[]>("/api/announcements");
+      const data = await listAnnouncementsAction();
       setAnnouncements(sortAnnouncements(data));
     } catch (error) {
       console.error("Gagal memuat pengumuman:", error);
@@ -68,11 +67,7 @@ export function AnnouncementProvider({
       const title = payload.title.trim();
       if (!time || !title) return null;
       try {
-        const created = await fetchJSON<Announcement>("/api/announcements", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ time, title }),
-        });
+        const created = await createAnnouncementAction({ time, title });
         setAnnouncements((prev) => sortAnnouncements([...prev, created]));
         return created;
       } catch (error) {
@@ -85,9 +80,7 @@ export function AnnouncementProvider({
 
   const removeAnnouncement = useCallback(async (id: string) => {
     try {
-      await fetchJSON(`/api/announcements/${id}`, {
-        method: "DELETE",
-      });
+      await deleteAnnouncementAction(id);
       setAnnouncements((prev) => prev.filter((item) => item.id !== id));
       return true;
     } catch (error) {

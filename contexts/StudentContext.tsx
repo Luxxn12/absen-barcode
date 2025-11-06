@@ -9,7 +9,16 @@ import {
   useState,
 } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
-import { fetchJSON } from "@/lib/fetchJSON";
+import {
+  listStudentsAction,
+  listClassesAction,
+  createStudentAction,
+  updateStudentAction,
+  deleteStudentAction,
+  createClassAction,
+  updateClassAction,
+  deleteClassAction,
+} from "@/app/actions/students";
 
 export type Student = {
   id: string;
@@ -68,12 +77,27 @@ export function StudentProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [studentData, classData] = await Promise.all([
-        fetchJSON<Student[]>("/api/students"),
-        fetchJSON<ClassGroup[]>("/api/classes"),
+      const [classRows, studentRows] = await Promise.all([
+        listClassesAction(),
+        listStudentsAction(),
       ]);
-      setStudents(sortByName(studentData));
-      setClasses(sortByName(classData));
+      const nextClasses = sortByName(
+        classRows.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+        }))
+      );
+      const classMap = new Map(nextClasses.map((item) => [item.id, item.name]));
+      const nextStudents = sortByName(
+        studentRows.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          classId: entry.classId,
+          className: classMap.get(entry.classId) ?? "-",
+        }))
+      );
+      setClasses(nextClasses);
+      setStudents(nextStudents);
     } catch (error) {
       console.error("Gagal memuat data siswa/kelas:", error);
     } finally {
@@ -89,46 +113,56 @@ export function StudentProvider({ children }: { children: React.ReactNode }) {
   const addStudent = useCallback(
     async (payload: AddStudentPayload) => {
       try {
-        const created = await fetchJSON<Student>("/api/students", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        setStudents((prev) => sortByName([...prev, created]));
-        return created;
+        const created = await createStudentAction(payload);
+        const className =
+          classes.find((item) => item.id === created.classId)?.name ?? "-";
+        const mapped: Student = {
+          id: created.id,
+          name: created.name,
+          classId: created.classId,
+          className,
+        };
+        setStudents((prev) => sortByName([...prev, mapped]));
+        return mapped;
       } catch (error) {
         console.error("Gagal menambahkan siswa:", error);
         return null;
       }
     },
-    []
+    [classes]
   );
 
   const updateStudent = useCallback(
     async (id: string, updates: UpdateStudentPayload) => {
       try {
-        const updated = await fetchJSON<Student>(`/api/students/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updates),
-        });
+        const updated = await updateStudentAction(id, updates);
+        const className =
+          classes.find((item) => item.id === updated.classId)?.name ??
+          students.find((item) => item.id === id)?.className ??
+          "-";
+        const mapped: Student = {
+          id: updated.id,
+          name: updated.name,
+          classId: updated.classId,
+          className,
+        };
         setStudents((prev) =>
-          sortByName(prev.map((student) => (student.id === id ? updated : student)))
+          sortByName(
+            prev.map((student) => (student.id === id ? mapped : student))
+          )
         );
-        return updated;
+        return mapped;
       } catch (error) {
         console.error("Gagal memperbarui siswa:", error);
         return null;
       }
     },
-    []
+    [classes, students]
   );
 
   const removeStudent = useCallback(async (id: string) => {
     try {
-      await fetchJSON(`/api/students/${id}`, {
-        method: "DELETE",
-      });
+      await deleteStudentAction(id);
       setStudents((prev) => prev.filter((student) => student.id !== id));
       return true;
     } catch (error) {
@@ -141,13 +175,10 @@ export function StudentProvider({ children }: { children: React.ReactNode }) {
     const trimmed = name.trim();
     if (!trimmed) return null;
     try {
-      const created = await fetchJSON<ClassGroup>("/api/classes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      setClasses((prev) => sortByName([...prev, created]));
-      return created;
+      const created = await createClassAction(trimmed);
+      const mapped: ClassGroup = { id: created.id, name: created.name };
+      setClasses((prev) => sortByName([...prev, mapped]));
+      return mapped;
     } catch (error) {
       console.error("Gagal menambahkan kelas:", error);
       return null;
@@ -160,24 +191,21 @@ export function StudentProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Nama kelas wajib diisi.");
     }
     try {
-      const updated = await fetchJSON<ClassGroup>(`/api/classes/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
+      const updated = await updateClassAction(id, trimmed);
+      const mapped: ClassGroup = { id: updated.id, name: updated.name };
       setClasses((prev) =>
         sortByName(
-          prev.map((classItem) => (classItem.id === id ? updated : classItem))
+          prev.map((classItem) => (classItem.id === id ? mapped : classItem))
         )
       );
       setStudents((prev) =>
         prev.map((student) =>
           student.classId === id
-            ? { ...student, className: updated.name }
+            ? { ...student, className: mapped.name }
             : student
         )
       );
-      return updated;
+      return mapped;
     } catch (error) {
       console.error("Gagal memperbarui kelas:", error);
       if (error instanceof Error && error.message.trim().length) {
@@ -189,9 +217,7 @@ export function StudentProvider({ children }: { children: React.ReactNode }) {
 
   const removeClass = useCallback(async (id: string) => {
     try {
-      await fetchJSON(`/api/classes/${id}`, {
-        method: "DELETE",
-      });
+      await deleteClassAction(id);
       setClasses((prev) => prev.filter((classItem) => classItem.id !== id));
       setStudents((prev) =>
         prev.filter((student) => student.classId !== id)
