@@ -5,6 +5,7 @@ type CliOptions = {
   email?: string;
   password?: string;
   name?: string;
+  role?: "guru" | "superadmin";
 };
 
 function parseArgs(): CliOptions {
@@ -21,6 +22,12 @@ function parseArgs(): CliOptions {
       options.password = value;
     } else if (key === "name") {
       options.name = value;
+    } else if (key === "role") {
+      if (value === "guru" || value === "superadmin") {
+        options.role = value;
+      } else {
+        console.warn(`Role ${value} tidak dikenal. Gunakan guru atau superadmin.`);
+      }
     }
   }
   return options;
@@ -31,9 +38,9 @@ async function main() {
     const args = parseArgs();
     const { created, email } = await ensureGuruAccount(args);
     if (created) {
-      console.log(`Akun guru ${email} berhasil dibuat.`);
+      console.log(`Akun ${email} berhasil dibuat.`);
     } else {
-      console.log(`Akun guru ${email} sudah ada dan telah diperbarui.`);
+      console.log(`Akun ${email} sudah ada dan telah diperbarui.`);
     }
   } catch (error) {
     console.error("Gagal memastikan akun guru:", error);

@@ -43,6 +43,7 @@ export type EnsureGuruAccountOptions = {
   email?: string;
   password?: string;
   name?: string;
+  role?: "guru" | "superadmin";
 };
 
 function resolveOption(
@@ -66,6 +67,7 @@ export async function ensureGuruAccount(
   const email = resolveOption(options.email, "SEED_GURU_EMAIL");
   const password = resolveOption(options.password, "SEED_GURU_PASSWORD");
   const name = resolveOption(options.name, "SEED_GURU_NAME");
+  const role = options.role ?? "guru";
 
   if (!email || !password) {
     throw new Error(
@@ -103,6 +105,7 @@ export async function ensureGuruAccount(
         name: resolvedName,
         password_hash: passwordHash,
         updated_at: now,
+        role,
       } satisfies Record<string, unknown>)
       .eq("id", existingId);
 
@@ -121,6 +124,7 @@ export async function ensureGuruAccount(
       password_hash: passwordHash,
       created_at: now,
       updated_at: now,
+      role,
     } satisfies Record<string, unknown>);
 
   if (insertError) {

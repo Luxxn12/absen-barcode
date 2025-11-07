@@ -71,6 +71,7 @@ export default function GuruSiswaPage() {
     loading,
   } = useStudents();
   const [search, setSearch] = useState("");
+  const [classFilter, setClassFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
@@ -98,14 +99,18 @@ export default function GuruSiswaPage() {
   const ITEMS_PER_PAGE = 10;
 
   const filteredStudents = useMemo(() => {
-    if (!search.trim()) return students;
-    return students.filter(
-      (student) =>
+    return students.filter((student) => {
+      const matchesSearch =
+        !search.trim() ||
         student.name.toLowerCase().includes(search.toLowerCase()) ||
         student.className.toLowerCase().includes(search.toLowerCase()) ||
-        student.id.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [students, search]);
+        student.id.toLowerCase().includes(search.toLowerCase());
+      const matchesClass = classFilter
+        ? student.classId === classFilter
+        : true;
+      return matchesSearch && matchesClass;
+    });
+  }, [students, search, classFilter]);
 
   const totalPages = Math.max(
     1,
@@ -242,28 +247,46 @@ export default function GuruSiswaPage() {
           </div>
         </header>
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-md">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
-              placeholder="Cari nama, kelas, atau ID barcode siswa"
-            />
+        <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex w-full flex-col gap-3 lg:max-w-2xl lg:flex-row lg:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
+                placeholder="Cari nama, kelas, atau ID barcode siswa"
+              />
+            </div>
+            <div className="flex-1 lg:max-w-xs">
+              <select
+                value={classFilter}
+                onChange={(event) => {
+                  setClassFilter(event.target.value);
+                  setPage(1);
+                }}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 outline-none ring-indigo-500 focus:border-indigo-500 focus:ring-2"
+              >
+                <option value="">Semua kelas</option>
+                {classes.map((classItem) => (
+                  <option key={classItem.id} value={classItem.id}>
+                    {classItem.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <p className="text-xs text-slate-400">
-            {loading
-              ? "Memuat data siswa..."
-              : (
-                  <>
-                    Total siswa ditampilkan:{" "}
-                    <strong>{totalFiltered}</strong>
-                  </>
-                )}
+            {loading ? (
+              "Memuat data siswa..."
+            ) : (
+              <>
+                Total siswa ditampilkan: <strong>{totalFiltered}</strong>
+              </>
+            )}
           </p>
         </div>
 
@@ -430,12 +453,12 @@ export default function GuruSiswaPage() {
                   }
                   required
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
-                  placeholder="contoh: Ahmad Fauzi"
-                />
-              </div>
-              <div>
-                <label className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  <span>Kelas</span>
+              placeholder="contoh: Ahmad Fauzi"
+            />
+          </div>
+          <div>
+            <label className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-slate-500">
+              <span>Kelas</span>
                   <button
                     type="button"
                     onClick={() => {

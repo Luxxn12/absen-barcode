@@ -11,12 +11,13 @@ import {
   BookOpen,
   Home,
   ListChecks,
+  ShieldCheck,
 } from "lucide-react";
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const baseNavItems = [
   { href: "/guru/dashboard", label: "Dashboard", icon: Home },
   { href: "/guru/status", label: "Status Harian", icon: ListChecks },
   { href: "/guru/siswa", label: "Data Siswa", icon: Users },
@@ -25,7 +26,7 @@ const navItems = [
   { href: "/guru/forum", label: "Forum", icon: MessageSquare },
 ];
 
-const mobileNav = [
+const baseMobileNav = [
   { href: "/guru/dashboard", label: "Home", icon: Home },
   { href: "/guru/status", label: "Status", icon: ListChecks },
   { href: "/guru/siswa", label: "Siswa", icon: Users },
@@ -42,14 +43,19 @@ export default function GuruLayout({
   const { session, hydrated, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const isSuperAdmin = session?.role === "superadmin";
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const guruName =
-    session?.role === "guru" ? session.name : "Guru / Admin";
+    session && (session.role === "guru" || session.role === "superadmin")
+      ? session.name
+      : "Guru / Admin";
   const guruEmail =
-    session?.role === "guru" ? session.email : "guru@example.com";
+    session && (session.role === "guru" || session.role === "superadmin")
+      ? session.email
+      : "guru@example.com";
   const guruInitials =
-    session?.role === "guru"
+    session && (session.role === "guru" || session.role === "superadmin")
       ? session.name
           .split(" ")
           .map((part) => part.charAt(0))
@@ -58,9 +64,32 @@ export default function GuruLayout({
           .toUpperCase()
       : "GA";
 
+  const navItems = useMemo(() => {
+    if (isSuperAdmin) {
+      return [
+        ...baseNavItems,
+        { href: "/guru/accounts", label: "Kelola Akun Guru", icon: ShieldCheck },
+      ];
+    }
+    return baseNavItems;
+  }, [isSuperAdmin]);
+
+  const mobileNav = useMemo(() => {
+    if (isSuperAdmin) {
+      return [
+        ...baseMobileNav,
+        { href: "/guru/accounts", label: "Akun", icon: ShieldCheck },
+      ];
+    }
+    return baseMobileNav;
+  }, [isSuperAdmin]);
+
   useEffect(() => {
     if (!hydrated) return;
-    if (session?.role !== "guru") {
+    if (
+      session?.role !== "guru" &&
+      session?.role !== "superadmin"
+    ) {
       router.replace("/login");
     }
   }, [hydrated, session, router]);
@@ -94,7 +123,10 @@ export default function GuruLayout({
     };
   }, []);
 
-  if (!hydrated || session?.role !== "guru") {
+  if (
+    !hydrated ||
+    (session?.role !== "guru" && session?.role !== "superadmin")
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100">
         <div className="rounded-2xl border border-slate-200 bg-white px-8 py-12 text-center shadow-sm">
@@ -115,7 +147,9 @@ export default function GuruLayout({
             <p className="text-sm font-semibold text-slate-900">
               Absensi Barcode
             </p>
-            <span className="text-xs text-slate-500">Mode Guru / Admin</span>
+            <span className="text-xs text-slate-500">
+              Mode {isSuperAdmin ? "Super Admin" : "Guru / Admin"}
+            </span>
           </div>
         </div>
 
@@ -165,7 +199,7 @@ export default function GuruLayout({
         <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/85 px-4 py-3 backdrop-blur md:px-8">
           <div>
             <p className="text-xs uppercase tracking-widest text-indigo-500">
-              Guru / Admin
+              {isSuperAdmin ? "Super Admin" : "Guru / Admin"}
             </p>
             <h1 className="text-lg font-semibold text-slate-900">
               {navItems.find((item) => pathname.startsWith(item.href))?.label ??

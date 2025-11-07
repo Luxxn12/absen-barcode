@@ -31,6 +31,7 @@ const statusColors: Record<
 export default function GuruStatusPage() {
   const {
     students,
+    classes,
     loading: studentsLoading,
     hydrated: studentsHydrated,
   } = useStudents();
@@ -55,6 +56,7 @@ export default function GuruStatusPage() {
     return selectedDate ?? fallbackDate;
   }, [availableDates, selectedDate, fallbackDate]);
   const [search, setSearch] = useState("");
+  const [classFilter, setClassFilter] = useState("");
   const dateOptions =
     availableDates.length > 0 ? availableDates : [activeDate];
   const [pendingStatus, setPendingStatus] = useState<
@@ -80,6 +82,11 @@ export default function GuruStatusPage() {
     return map;
   }, [recordsForDate]);
 
+  const filteredStudents = useMemo(() => {
+    if (!classFilter) return students;
+    return students.filter((student) => student.classId === classFilter);
+  }, [students, classFilter]);
+
   const summary = useMemo(() => {
     const totals = {
       Hadir: 0,
@@ -88,7 +95,7 @@ export default function GuruStatusPage() {
       Alfa: 0,
       BelumAbsen: 0,
     };
-    students.forEach((student) => {
+    filteredStudents.forEach((student) => {
       const record = recordMap.get(student.id);
       if (!record) {
         totals.BelumAbsen += 1;
@@ -97,10 +104,10 @@ export default function GuruStatusPage() {
       totals[record.status] += 1;
     });
     return totals;
-  }, [students, recordMap]);
+  }, [filteredStudents, recordMap]);
 
   const rows = useMemo<Row[]>(() => {
-    const base = students.map<Row>((student) => {
+    const base = filteredStudents.map<Row>((student) => {
       const record = recordMap.get(student.id);
       return {
         id: student.id,
@@ -120,7 +127,7 @@ export default function GuruStatusPage() {
         row.className.toLowerCase().includes(term) ||
         row.id.toLowerCase().includes(term)
     );
-  }, [students, recordMap, search]);
+  }, [filteredStudents, recordMap, search]);
 
   const dateLabel = useMemo(() => {
     if (!activeDate) return "-";
@@ -132,7 +139,7 @@ export default function GuruStatusPage() {
     });
   }, [activeDate]);
 
-  const totalStudents = students.length;
+  const totalStudents = filteredStudents.length;
   const totalDisplayed = rows.length;
   const tanpaKeterangan = summary.Alfa + summary.BelumAbsen;
   const isLoading =
@@ -280,7 +287,7 @@ export default function GuruStatusPage() {
         </div>
 
         <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-4 sm:flex-row">
+          <div className="flex flex-col gap-4 lg:flex-row">
             <div className="relative flex-1">
               <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <select
@@ -295,14 +302,30 @@ export default function GuruStatusPage() {
                 ))}
               </select>
             </div>
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
-                placeholder="Cari nama, kelas, atau ID siswa"
-              />
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
+                  placeholder="Cari nama, kelas, atau ID siswa"
+                />
+              </div>
+              <div className="flex-1 md:max-w-xs">
+                <select
+                  value={classFilter}
+                  onChange={(event) => setClassFilter(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 outline-none ring-indigo-500 focus:border-indigo-500 focus:ring-2"
+                >
+                  <option value="">Semua kelas</option>
+                  {classes.map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
           <p className="text-xs text-slate-400">

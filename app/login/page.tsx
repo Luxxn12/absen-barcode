@@ -3,11 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStudents } from "@/contexts/StudentContext";
 
 type RoleTab = "guru" | "siswa";
-
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,11 +17,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const isReady = authHydrated && studentHydrated;
 
   useEffect(() => {
     if (!isReady) return;
-    if (session?.role === "guru") {
+    if (session?.role === "superadmin") {
+      router.replace("/guru/accounts");
+    } else if (session?.role === "guru") {
       router.replace("/guru/dashboard");
     } else if (session?.role === "siswa") {
       router.replace("/siswa/scan");
@@ -31,14 +35,21 @@ export default function LoginPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
+    if (submitting) return;
 
     if (activeTab === "guru") {
-      const success = await loginGuru(email, password);
-      if (!success) {
+      setSubmitting(true);
+      const result = await loginGuru(email, password);
+      if (!result) {
         setError("Email atau password salah.");
+        setSubmitting(false);
         return;
       }
-      router.replace("/guru/dashboard");
+      if (result === "superadmin") {
+        router.replace("/guru/accounts");
+      } else {
+        router.replace("/guru/dashboard");
+      }
       return;
     }
   };
@@ -112,14 +123,28 @@ export default function LoginPage() {
                 <label className="mb-2 block text-sm font-medium text-slate-600">
                   Password
                 </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
-                  placeholder="•••••"
-                  autoComplete="current-password"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-12 text-slate-900 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
+                    placeholder="•••••"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600 focus:outline-none"
+                    aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -146,10 +171,17 @@ export default function LoginPage() {
           {activeTab === "guru" ? (
             <button
               type="submit"
-              disabled={!isReady}
+              disabled={!isReady || submitting}
               className="inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:bg-indigo-300 disabled:shadow-none"
             >
-              Masuk Sekarang
+              {submitting ? (
+                <span className="inline-flex items-center gap-2 text-sm">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Memproses...
+                </span>
+              ) : (
+                "Masuk Sekarang"
+              )}
             </button>
           ) : (
             <Link

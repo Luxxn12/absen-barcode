@@ -16,17 +16,26 @@ type GuruSession = {
   name: string;
 };
 
+type SuperAdminSession = {
+  role: "superadmin";
+  email: string;
+  name: string;
+};
+
 type SiswaSession = {
   role: "siswa";
   studentId: string;
 };
 
-export type Session = GuruSession | SiswaSession | null;
+export type Session = GuruSession | SuperAdminSession | SiswaSession | null;
 
 type AuthContextValue = {
   session: Session;
   hydrated: boolean;
-  loginGuru: (email: string, password: string) => Promise<boolean>;
+  loginGuru: (
+    email: string,
+    password: string
+  ) => Promise<"guru" | "superadmin" | false>;
   loginSiswa: (studentId: string) => void;
   logout: () => void;
 };
@@ -94,19 +103,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const payload = (await response.json()) as {
           success?: boolean;
-          user?: { email: string; name: string };
+          user?: { email: string; name: string; role?: "guru" | "superadmin" };
         };
 
         if (!payload.success || !payload.user) {
           return false;
         }
 
-        setSession({
-          role: "guru",
-          email: payload.user.email,
-          name: payload.user.name,
-        });
-        return true;
+        const role = payload.user.role ?? "guru";
+        if (role === "superadmin") {
+          setSession({
+            role: "superadmin",
+            email: payload.user.email,
+            name: payload.user.name,
+          });
+          return "superadmin";
+        } else {
+          setSession({
+            role: "guru",
+            email: payload.user.email,
+            name: payload.user.name,
+          });
+          return "guru";
+        }
       } catch (error) {
         console.error("[AuthContext][loginGuru]", error);
         return false;

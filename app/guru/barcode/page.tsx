@@ -6,19 +6,24 @@ import { Download, Printer, Search, X } from "lucide-react";
 import { useStudents } from "@/contexts/StudentContext";
 
 export default function GuruBarcodePage() {
-  const { students, loading } = useStudents();
+  const { students, classes, loading } = useStudents();
   const [search, setSearch] = useState("");
+  const [selectedClass, setSelectedClass] = useState<string>("");
   const [previewStudentId, setPreviewStudentId] = useState<string | null>(null);
   const qrRefs = useRef<Record<string, SVGSVGElement | null>>({});
 
   const filtered = useMemo(
     () =>
-      students.filter((student) =>
-        `${student.name} ${student.className} ${student.id}`
+      students.filter((student) => {
+        const matchesSearch = `${student.name} ${student.className} ${student.id}`
           .toLowerCase()
-          .includes(search.toLowerCase())
-      ),
-    [students, search]
+          .includes(search.toLowerCase());
+        const matchesClass = selectedClass
+          ? student.classId === selectedClass
+          : true;
+        return matchesSearch && matchesClass;
+      }),
+    [students, search, selectedClass]
   );
 
   const getStudentById = useCallback(
@@ -158,14 +163,30 @@ export default function GuruBarcodePage() {
         </header>
 
         <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
-              placeholder="Cari nama siswa atau kelas…"
-            />
+          <div className="flex w-full flex-col gap-3 md:max-w-2xl md:flex-row md:items-center md:gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
+                placeholder="Cari nama siswa atau kelas…"
+              />
+            </div>
+            <div className="flex-1 md:max-w-xs">
+              <select
+                value={selectedClass}
+                onChange={(event) => setSelectedClass(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 outline-none ring-indigo-500 focus:border-indigo-500 focus:ring-2"
+              >
+                <option value="">Semua kelas</option>
+                {classes.map((classItem) => (
+                  <option key={classItem.id} value={classItem.id}>
+                    {classItem.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <p className="text-xs text-slate-400">
             {loading ? (

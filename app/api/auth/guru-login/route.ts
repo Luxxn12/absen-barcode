@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const supabase = createSupabaseServerClient();
     const { data: account, error } = await supabase
       .from(ACCOUNT_TABLE)
-      .select("id,email,name,password_hash")
+      .select("id,email,name,password_hash,role")
       .eq("email", emailInput)
       .maybeSingle();
 
@@ -51,11 +51,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const role =
+      typeof account.role === "string" && account.role.length
+        ? (account.role as "guru" | "superadmin")
+        : "guru";
+
     return NextResponse.json({
       success: true,
       user: {
         email: account.email,
         name: account.name,
+        role,
       },
     });
   } catch (error) {
