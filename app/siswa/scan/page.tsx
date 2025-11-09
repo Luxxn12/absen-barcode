@@ -317,6 +317,7 @@ export default function SiswaScanPage() {
         message: "Pastikan wajah terlihat jelas di kamera.",
       });
       setFacePending(false);
+      return;
     }
 
     if (!facePending) {
