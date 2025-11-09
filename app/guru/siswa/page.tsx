@@ -238,7 +238,7 @@ export default function GuruSiswaPage() {
               Data Siswa
             </p>
             <h2 className="text-xl font-semibold text-slate-900">
-              Kelola data siswa & barcode
+              Kelola data siswa, barcode & wajah
             </h2>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
