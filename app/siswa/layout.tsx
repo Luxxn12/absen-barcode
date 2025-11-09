@@ -26,6 +26,7 @@ export default function SiswaLayout({
   const pathname = usePathname();
 
   const isScanOnlyAccess = pathname === "/siswa/scan";
+  const isScanPage = isScanOnlyAccess;
   const visibleNavItems =
     session?.role === "siswa"
       ? navItems
@@ -100,9 +101,17 @@ export default function SiswaLayout({
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main
+        className={cn(
+          "flex-1 px-4 py-6 sm:px-6 sm:py-8",
+          isScanPage ? "pb-32 sm:pb-8" : ""
+        )}
+      >
+        {children}
+      </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-6 py-3 backdrop-blur sm:static sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
+      {!isScanPage && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-6 py-3 backdrop-blur sm:static sm:border-t-0 sm:bg-transparent sm:px-0 sm:py-0">
         <div
           className={cn(
             "mx-auto flex max-w-md items-center sm:hidden",
@@ -155,7 +164,8 @@ export default function SiswaLayout({
             );
           })}
         </div>
-      </nav>
+        </nav>
+      )}
     </div>
   );
 }
