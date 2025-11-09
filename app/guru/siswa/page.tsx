@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Plus,
   Search,
@@ -12,6 +19,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { Student, useStudents } from "@/contexts/StudentContext";
+import { cn } from "@/lib/utils";
+import { loadFaceApiModels } from "@/lib/faceApi";
 
 function StudentsSkeleton() {
   return (
@@ -72,6 +81,8 @@ export default function GuruSiswaPage() {
   } = useStudents();
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("");
+  const [faceModalStudent, setFaceModalStudent] = useState<Student | null>(null);
+  const [faceReadyIds, setFaceReadyIds] = useState<Set<string>>(new Set());
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
@@ -95,6 +106,20 @@ export default function GuruSiswaPage() {
   const classActionInProgress = Boolean(
     creatingClass || savingClassId || deletingClassId
   );
+  const refreshFaceStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/faces");
+      if (!response.ok) return;
+      const rows = (await response.json()) as Array<{ studentId: string }>;
+      setFaceReadyIds(new Set(rows.map((row) => row.studentId)));
+    } catch (error) {
+      console.error("Gagal memuat status wajah:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshFaceStatus();
+  }, [refreshFaceStatus]);
 
   const ITEMS_PER_PAGE = 10;
 
@@ -312,6 +337,11 @@ export default function GuruSiswaPage() {
                       <QrCode className="h-4 w-4" />
                       {student.id}
                     </span>
+                    {faceReadyIds.has(student.id) && (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-600">
+                        Wajah siap
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -321,6 +351,15 @@ export default function GuruSiswaPage() {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                         Edit
+                      </button>
+                      <button
+                        onClick={() => setFaceModalStudent(student)}
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-indigo-600 transition hover:border-indigo-200 hover:bg-indigo-50"
+                      >
+                        <QrCode className="h-3.5 w-3.5" />
+                        {faceReadyIds.has(student.id)
+                          ? "Perbarui Wajah"
+                          : "Daftarkan Wajah"}
                       </button>
                       <button
                         onClick={() => setConfirmDelete(student)}
@@ -360,12 +399,25 @@ export default function GuruSiswaPage() {
                   {student.id}
                 </span>
               </div>
+              {faceReadyIds.has(student.id) && (
+                <p className="mt-2 text-xs font-semibold text-emerald-600">
+                  Wajah sudah terdaftar
+                </p>
+              )}
               <div className="mt-5 flex items-center gap-3">
                 <button
                   onClick={() => openEditModal(student)}
                   className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-indigo-500/30 transition hover:bg-indigo-700"
                 >
                   Edit Data
+                </button>
+                <button
+                  onClick={() => setFaceModalStudent(student)}
+                  className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100"
+                >
+                  {faceReadyIds.has(student.id)
+                    ? "Perbarui Wajah"
+                    : "Daftarkan Wajah"}
                 </button>
                 <button
                   onClick={() => setConfirmDelete(student)}
@@ -862,6 +914,180 @@ export default function GuruSiswaPage() {
           </div>
         </div>
       )}
+      {faceModalStudent && (
+        <FaceEnrollmentModal
+          student={faceModalStudent}
+          onClose={() => setFaceModalStudent(null)}
+          onSuccess={async () => {
+            setFaceModalStudent(null);
+            await refreshFaceStatus();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+type FaceEnrollmentModalProps = {
+  student: Student;
+  onClose: () => void;
+  onSuccess: () => void;
+};
+
+function FaceEnrollmentModal({
+  student,
+  onClose,
+  onSuccess,
+}: FaceEnrollmentModalProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
+    "idle"
+  );
+  const [message, setMessage] = useState(
+    "Pastikan wajah berada di tengah frame."
+  );
+  const [cameraError, setCameraError] = useState("");
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadFaceApiModels();
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+        });
+        if (cancelled) return;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } catch (error) {
+        console.error("Gagal membuka kamera:", error);
+        setCameraError(
+          "Tidak dapat mengakses kamera. Pastikan izin kamera diaktifkan."
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+      stream?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const handleCapture = useCallback(async () => {
+    if (!videoRef.current) return;
+    setStatus("loading");
+    setMessage("Menganalisis wajah...");
+    try {
+      const faceapiLib = await loadFaceApiModels();
+      const detection = await faceapiLib
+        .detectSingleFace(
+          videoRef.current,
+          new faceapiLib.TinyFaceDetectorOptions()
+        )
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection) {
+        setStatus("error");
+        setMessage("Wajah belum terdeteksi. Pastikan pencahayaan cukup.");
+        return;
+      }
+
+      const descriptor = Array.from(detection.descriptor);
+      const response = await fetch("/api/faces/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: student.id,
+          descriptor,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(
+          payload?.error ?? "Gagal menyimpan data wajah. Coba lagi."
+        );
+      }
+
+      setStatus("success");
+      setMessage("Data wajah tersimpan. Wajah siswa siap digunakan.");
+      onSuccess();
+    } catch (error) {
+      console.error(error);
+      setStatus("error");
+      setMessage(
+        error instanceof Error ? error.message : "Gagal menangkap wajah."
+      );
+    }
+  }, [student.id, onSuccess]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-indigo-500">
+              Pendaftaran Wajah
+            </p>
+            <h3 className="text-lg font-semibold text-slate-900">
+              {student.name}
+            </h3>
+            <p className="text-sm text-slate-500">{student.className}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="mt-4 rounded-3xl border border-slate-100 bg-slate-50 p-4">
+          {cameraError ? (
+            <p className="text-sm text-rose-500">{cameraError}</p>
+          ) : (
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className="h-64 w-full rounded-2xl bg-black/60 object-cover"
+            />
+          )}
+        </div>
+        <p
+          className={cn(
+            "mt-4 rounded-2xl px-4 py-2 text-xs font-semibold",
+            status === "success"
+              ? "bg-emerald-50 text-emerald-600"
+              : status === "error"
+                ? "bg-rose-50 text-rose-600"
+                : "bg-slate-50 text-slate-500"
+          )}
+        >
+          {message}
+        </p>
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            onClick={handleCapture}
+            disabled={status === "loading" || Boolean(cameraError)}
+            className="flex-1 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+          >
+            {status === "loading" ? "Menganalisis…" : "Simpan Wajah"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

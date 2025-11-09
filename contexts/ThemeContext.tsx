@@ -41,11 +41,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "dark" || stored === "light") {
-      setThemeState(stored);
-      return;
-    }
-    setThemeState(getInitialTheme());
+    const nextTheme =
+      stored === "dark" || stored === "light" ? stored : getInitialTheme();
+    const frame = requestAnimationFrame(() => {
+      setThemeState(nextTheme);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [hydrated]);
 
   useEffect(() => {

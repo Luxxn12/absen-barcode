@@ -305,16 +305,22 @@ export default function SiswaScanPage() {
       });
       setCameraKey((prev) => prev + 1);
       setHasPermissionIssue(false);
-    } else {
-      if (faceScanState.status === "success") {
-        setFaceScanState({
-          status: "idle",
-          message: "Pastikan wajah terlihat jelas di kamera.",
-        });
-        setFacePending(false);
-      } else if (!facePending) {
-        void handleFaceAttendance();
-      }
+      return;
+    }
+
+    const hasFaceResult =
+      faceScanState.status === "success" || faceScanState.status === "error";
+
+    if (hasFaceResult) {
+      setFaceScanState({
+        status: "idle",
+        message: "Pastikan wajah terlihat jelas di kamera.",
+      });
+      setFacePending(false);
+    }
+
+    if (!facePending) {
+      void handleFaceAttendance();
     }
   }, [mode, facePending, faceScanState.status, handleFaceAttendance]);
 
@@ -598,7 +604,12 @@ export default function SiswaScanPage() {
             disabled={actionDisabled}
             className="flex w-full items-center justify-center rounded-full bg-indigo-600 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
           >
-            <Camera className="h-5 w-5" />
+            {faceScanState.status === "success" ||
+            faceScanState.status === "error" ? (
+              <RefreshCw className="h-5 w-5" />
+            ) : (
+              <Camera className="h-5 w-5" />
+            )}
           </button>
         </div>
       )}
