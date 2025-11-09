@@ -17,6 +17,7 @@ import {
   X,
   Settings2,
   Loader2,
+  ScanFace,
 } from "lucide-react";
 import { Student, useStudents } from "@/contexts/StudentContext";
 import { cn } from "@/lib/utils";
@@ -337,9 +338,13 @@ export default function GuruSiswaPage() {
                       <QrCode className="h-4 w-4" />
                       {student.id}
                     </span>
-                    {faceReadyIds.has(student.id) && (
+                    {faceReadyIds.has(student.id) ? (
                       <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-600">
                         Wajah siap
+                      </span>
+                    ) : (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-600">
+                        Belum ada data wajah
                       </span>
                     )}
                   </td>
@@ -356,7 +361,7 @@ export default function GuruSiswaPage() {
                         onClick={() => setFaceModalStudent(student)}
                         className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-indigo-600 transition hover:border-indigo-200 hover:bg-indigo-50"
                       >
-                        <QrCode className="h-3.5 w-3.5" />
+                        <ScanFace className="h-3.5 w-3.5" />
                         {faceReadyIds.has(student.id)
                           ? "Perbarui Wajah"
                           : "Daftarkan Wajah"}
@@ -399,11 +404,18 @@ export default function GuruSiswaPage() {
                   {student.id}
                 </span>
               </div>
-              {faceReadyIds.has(student.id) && (
-                <p className="mt-2 text-xs font-semibold text-emerald-600">
-                  Wajah sudah terdaftar
-                </p>
-              )}
+              <p
+                className={cn(
+                  "mt-2 text-xs font-semibold",
+                  faceReadyIds.has(student.id)
+                    ? "text-emerald-600"
+                    : "text-amber-600"
+                )}
+              >
+                {faceReadyIds.has(student.id)
+                  ? "Wajah sudah terdaftar"
+                  : "Belum ada data wajah"}
+              </p>
               <div className="mt-5 flex items-center gap-3">
                 <button
                   onClick={() => openEditModal(student)}

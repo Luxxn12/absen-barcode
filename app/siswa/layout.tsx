@@ -79,7 +79,7 @@ export default function SiswaLayout({
             <p className="text-xs text-slate-500">Kelas {student.className}</p>
           ) : (
             <p className="text-xs text-slate-500">
-              Gunakan barcode unik Anda untuk melakukan absensi.
+              Gunakan barcode atau wajah unik Anda untuk melakukan absensi.
             </p>
           )}
         </div>

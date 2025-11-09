@@ -1,4 +1,4 @@
-# Absensi Barcode
+# Absensi Barcode & Wajah
 
 Aplikasi absensi sekolah berbasis barcode + pengenalan wajah yang dibangun di atas Next.js 16 + Supabase. Portal guru menampilkan dashboard harian, pengelolaan siswa/kelas, generator QR, rekap bulanan, forum komunikasi, pendaftaran biometrik, serta manajemen akun super-admin. Portal siswa menyediakan pengalaman scan barcode atau wajah langsung melalui kamera perangkat dan tampilan status kehadiran secara real-time.
 
@@ -202,7 +202,7 @@ SEED_GURU_NAME=Guru Piket
 
 - **Login Guru/Super Admin**: `AuthContext` memanggil `/api/auth/guru-login`, menyimpan sesi di `localStorage`, dan mengarahkan user ke halaman yang sesuai (`/guru/dashboard` atau `/guru/accounts`).
 - **Pengelolaan data**: Seluruh halaman guru dibungkus oleh `StudentProvider`, `AttendanceProvider`, dan `AnnouncementProvider`. Server Actions melakukan query Supabase dan memicu `revalidatePath` agar halaman terkait tetap konsisten.
-- **Absensi Barcode**: Guru menerbitkan QR dari halaman `/guru/barcode`. Siswa memindai melalui `/siswa/scan`, lalu klien memanggil `upsertAttendanceAction` untuk menyimpan status `Hadir` beserta jamnya.
+- **Absensi Barcode & Wajah**: Guru menerbitkan QR dari halaman `/guru/barcode`. Siswa memindai melalui `/siswa/scan`, lalu klien memanggil `upsertAttendanceAction` untuk menyimpan status `Hadir` beserta jamnya.
 - **Rekap dan ekspor**: `/guru/rekap` mengagregasi `AttendanceRecord` di sisi klien, kemudian membuat file CSV menggunakan `Blob` API.
 - **Forum komunikasi**: `/guru/forum` mengirim catatan ke tabel `ForumEntry`, menampilkan mood badge per siswa, dan memungkinkan penghapusan laporan.
 - **Akun Guru**: Hanya super-admin yang dapat mengakses `/guru/accounts`. Semua password disimpan sebagai hash `bcrypt` melalui aksi server dan skrip CLI.

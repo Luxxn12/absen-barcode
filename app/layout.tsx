@@ -18,9 +18,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Absensi Barcode Sekolah",
+  title: "Absensi Barcode & Wajah Sekolah",
   description:
-    "Dashboard absensi barcode dengan role Guru dan Siswa. UI interaktif dan mobile friendly.",
+    "Dashboard absensi barcode & wajah dengan role Guru dan Siswa. UI interaktif dan mobile friendly.",
 };
 
 export default function RootLayout({

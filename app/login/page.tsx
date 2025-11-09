@@ -69,7 +69,7 @@ export default function LoginPage() {
         <div className="mb-8 flex flex-col gap-3 text-center">
           <div className="inline-flex items-center justify-center gap-2">
             <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-indigo-600">
-              Absensi Barcode
+              Absensi Barcode & Wajah
             </span>
           </div>
           <h1 className="text-3xl font-semibold text-slate-900">
@@ -158,9 +158,9 @@ export default function LoginPage() {
                   Akses Cepat untuk Siswa
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Setiap kartu barcode sudah berisi identitas unik siswa. Cukup
-                  tekan tombol di bawah untuk langsung masuk ke halaman scan
-                  tanpa perlu memilih nama.
+                  Setiap kartu barcode dan profil wajah sudah berisi identitas
+                  unik siswa. Cukup tekan tombol di bawah untuk langsung masuk
+                  ke halaman scan (barcode atau wajah) tanpa perlu memilih nama.
                 </p>
               </div>
             </div>
@@ -205,11 +205,11 @@ export default function LoginPage() {
           </div>
           <div className="mt-4 grid gap-3 text-xs text-slate-500 sm:grid-cols-2">
             <div className="rounded-xl bg-slate-100 px-4 py-3">
-              Role guru memiliki akses penuh untuk mengelola data siswa, barcode,
+              Role guru memiliki akses penuh untuk mengelola data siswa, barcode, scan wajah,
               rekap dan forum komunikasi.
             </div>
             <div className="rounded-xl bg-slate-100 px-4 py-3">
-              Role siswa hanya dapat melakukan scan barcode dari guru dan melihat
+              Role siswa hanya dapat melakukan scan barcode & scan wajah dari guru dan melihat
               status kehadiran hari ini.
             </div>
           </div>

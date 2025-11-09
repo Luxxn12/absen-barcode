@@ -146,7 +146,7 @@ export default function GuruLayout({
           </span>
           <div>
             <p className="text-sm font-semibold text-slate-900">
-              Absensi Barcode
+              Absensi Barcode & Wajah
             </p>
             <span className="text-xs text-slate-500">
               Mode {isSuperAdmin ? "Super Admin" : "Guru / Admin"}
