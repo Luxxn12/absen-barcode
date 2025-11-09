@@ -1,6 +1,6 @@
 # Absensi Barcode
 
-Aplikasi absensi sekolah berbasis barcode yang dibangun di atas Next.js 16 + Supabase. Portal guru menampilkan dashboard harian, pengelolaan siswa/kelas, generator QR, rekap bulanan, forum komunikasi, serta manajemen akun super-admin. Portal siswa menyediakan pengalaman scan barcode langsung melalui kamera perangkat dan tampilan status kehadiran secara real-time.
+Aplikasi absensi sekolah berbasis barcode + pengenalan wajah yang dibangun di atas Next.js 16 + Supabase. Portal guru menampilkan dashboard harian, pengelolaan siswa/kelas, generator QR, rekap bulanan, forum komunikasi, pendaftaran biometrik, serta manajemen akun super-admin. Portal siswa menyediakan pengalaman scan barcode atau wajah langsung melalui kamera perangkat dan tampilan status kehadiran secara real-time.
 
 ## Fitur utama
 
@@ -9,12 +9,14 @@ Aplikasi absensi sekolah berbasis barcode yang dibangun di atas Next.js 16 + Sup
   - Tabel status hadir per tanggal dengan kemampuan edit manual, filter kelas, dan input jam check-in.
   - CRUD data siswa & kelas lengkap dengan pencarian, paginasi, serta sinkronisasi instan via React Context + Server Actions.
   - Generator QR untuk setiap siswa (preview, unduh SVG, cetak massal).
+  - Modal pendaftaran wajah per siswa: ambil foto dari webcam guru, validasi deteksi wajah, dan unggah descriptor ke Supabase.
   - Rekap bulanan per kelas dengan ekspor CSV.
   - Forum komunikasi kondisi emosional siswa beserta penandaan mood.
   - Halaman khusus super-admin untuk membuat/menghapus akun guru dengan password terenkripsi (bcrypt).
 
 - **Portal Siswa**
   - Halaman scan berbasis `react-qr-barcode-scanner` untuk merekam kehadiran secara otomatis (status Hadir + jam lokal).
+  - Mode alternatif pengenalan wajah (face-api.js) yang menyalakan kamera depan, melakukan pencocokan descriptor, dan langsung mengirim absensi.
   - Ringkasan status hari ini dan riwayat 3 hari terakhir.
   - Landing page berisi tips penggunaan dan tautan cepat.
 
@@ -30,6 +32,7 @@ Aplikasi absensi sekolah berbasis barcode yang dibangun di atas Next.js 16 + Sup
 - Supabase (`@supabase/supabase-js`) untuk database & auth kustom
 - Tailwind CSS 4 (via `@tailwindcss/postcss`) untuk styling utility-first
 - `react-qr-barcode-scanner` dan `qrcode.react` untuk proses scan & generator
+- `face-api.js` + WebRTC `getUserMedia()` untuk registrasi dan verifikasi wajah
 - `lucide-react` untuk ikon, `bcryptjs` untuk hashing password
 - `tsx` + skrip CLI untuk memastikan akun guru default
 
@@ -111,9 +114,25 @@ create table "ForumEntry" (
   "createdAt" timestamptz default now(),
   "updatedAt" timestamptz default now()
 );
+
+create table "StudentFaces" (
+  id uuid primary key default gen_random_uuid(),
+  studentid text not null references "Student"(id) on delete cascade,
+  descriptor double precision[] not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (studentid)
+);
 ```
 
 Aktifkan Row-Level Security sesuai kebijakan sekolah bila aplikasi akan dipakai produksi. Pada mode demo/local, server actions berjalan menggunakan `SUPABASE_SERVICE_ROLE_KEY`, jadi pastikan kredensial tersebut tidak diekspose ke publik.
+
+## Pengenalan wajah (opsional tetapi direkomendasikan)
+
+- **Registrasi wajah siswa** terjadi melalui halaman `Guru > Siswa`. Tombol “Daftarkan Wajah” membuka modal, memuat model `face-api.js` dari CDN, menyalakan kamera guru, memastikan hanya satu wajah terdeteksi, lalu mengirim descriptor (128 angka `Float32`) ke `/api/faces/register`.
+- **Pencocokan wajah siswa** tersedia pada halaman `/siswa/scan`. Siswa dapat berganti mode `Barcode` ↔ `Face`. Pada mode wajah aplikasi mengunduh seluruh descriptor dari `/api/faces`, menghitung jarak Euclidean antar embedding, dan otomatis menjalankan `upsertAttendanceAction` ketika skor berada di bawah ambang batas (default `0.38`).
+- **Tabel `StudentFaces` bersifat opsional**. Jika belum dibuat, API akan mengembalikan peringatan ramah dan aplikasi tetap dapat digunakan dengan barcode biasa. Buat tabel tersebut untuk mengaktifkan mode wajah.
+- Pastikan browser memiliki izin kamera, pencahayaan memadai, dan koneksi ke CDN model tidak diblokir. Untuk lingkungan intranet tanpa akses internet, salin bobot model ke storage lokal dan sesuaikan konstanta `MODEL_BASES` di `lib/faceApi.ts`.
 
 ## Variabel lingkungan
 
