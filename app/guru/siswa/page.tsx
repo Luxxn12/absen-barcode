@@ -82,7 +82,9 @@ export default function GuruSiswaPage() {
   } = useStudents();
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("");
-  const [faceModalStudent, setFaceModalStudent] = useState<Student | null>(null);
+  const [faceModalStudent, setFaceModalStudent] = useState<Student | null>(
+    null
+  );
   const [faceReadyIds, setFaceReadyIds] = useState<Set<string>>(new Set());
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -131,9 +133,7 @@ export default function GuruSiswaPage() {
         student.name.toLowerCase().includes(search.toLowerCase()) ||
         student.className.toLowerCase().includes(search.toLowerCase()) ||
         student.id.toLowerCase().includes(search.toLowerCase());
-      const matchesClass = classFilter
-        ? student.classId === classFilter
-        : true;
+      const matchesClass = classFilter ? student.classId === classFilter : true;
       return matchesSearch && matchesClass;
     });
   }, [students, search, classFilter]);
@@ -151,9 +151,7 @@ export default function GuruSiswaPage() {
   }, [filteredStudents, safePage]);
 
   const startItem =
-    paginatedStudents.length === 0
-      ? 0
-      : (safePage - 1) * ITEMS_PER_PAGE + 1;
+    paginatedStudents.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1;
   const endItem = (safePage - 1) * ITEMS_PER_PAGE + paginatedStudents.length;
   const totalFiltered = filteredStudents.length;
 
@@ -323,12 +321,16 @@ export default function GuruSiswaPage() {
                 <th className="px-6 py-3">Nama</th>
                 <th className="px-6 py-3">Kelas</th>
                 <th className="px-6 py-3">QR Code</th>
+                <th className="px-6 py-3">Scan Wajah</th>
                 <th className="px-6 py-3">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
               {paginatedStudents.map((student) => (
-                <tr key={student.id} className="transition hover:bg-slate-50/60">
+                <tr
+                  key={student.id}
+                  className="transition hover:bg-slate-50/60"
+                >
                   <td className="px-6 py-4 font-semibold text-slate-900">
                     {student.name}
                   </td>
@@ -338,12 +340,16 @@ export default function GuruSiswaPage() {
                       <QrCode className="h-4 w-4" />
                       {student.id}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
                     {faceReadyIds.has(student.id) ? (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-600">
+                      <span className=" inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-600">
+                        <ScanFace className="h-4 w-4" />
                         Wajah siap
                       </span>
                     ) : (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-600">
+                      <span className=" inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-600">
+                        <ScanFace className="h-4 w-4" />
                         Belum ada data wajah
                       </span>
                     )}
@@ -453,8 +459,8 @@ export default function GuruSiswaPage() {
             <strong className="text-slate-700">
               {startItem === 0 ? 0 : `${startItem}-${endItem}`}
             </strong>{" "}
-            dari{" "}
-            <strong className="text-slate-700">{totalFiltered}</strong> siswa
+            dari <strong className="text-slate-700">{totalFiltered}</strong>{" "}
+            siswa
           </p>
           <div className="flex items-center gap-2 text-[11px] sm:text-xs">
             <button
@@ -468,9 +474,7 @@ export default function GuruSiswaPage() {
               Halaman {safePage} dari {totalPages}
             </span>
             <button
-              onClick={() =>
-                setPage((prev) => Math.min(totalPages, prev + 1))
-              }
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={safePage === totalPages || totalFiltered === 0}
               className="rounded-full border border-slate-200 px-3 py-2 font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -517,12 +521,12 @@ export default function GuruSiswaPage() {
                   }
                   required
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
-              placeholder="contoh: Ahmad Fauzi"
-            />
-          </div>
-          <div>
-            <label className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-slate-500">
-              <span>Kelas</span>
+                  placeholder="contoh: Ahmad Fauzi"
+                />
+              </div>
+              <div>
+                <label className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  <span>Kelas</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -644,61 +648,61 @@ export default function GuruSiswaPage() {
                     placeholder="contoh: XII IPA 3"
                     className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none ring-indigo-500 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2"
                   />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (creatingClass) return;
-                    const trimmed = newClassName.trim();
-                    if (!trimmed) return;
-                    const exists = classes.some(
-                      (classItem) =>
-                        classItem.name.toLocaleLowerCase("id-ID") ===
-                        trimmed.toLocaleLowerCase("id-ID")
-                    );
-                    if (exists) {
-                      setClassError("Kelas sudah terdaftar.");
-                      setNewClassName("");
-                      return;
-                    }
-                    setCreatingClass(true);
-                    try {
-                      const created = await addClass(trimmed);
-                      if (created) {
-                        setClassDrafts((prev) => ({
-                          ...prev,
-                          [created.id]: created.name,
-                        }));
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (creatingClass) return;
+                      const trimmed = newClassName.trim();
+                      if (!trimmed) return;
+                      const exists = classes.some(
+                        (classItem) =>
+                          classItem.name.toLocaleLowerCase("id-ID") ===
+                          trimmed.toLocaleLowerCase("id-ID")
+                      );
+                      if (exists) {
+                        setClassError("Kelas sudah terdaftar.");
                         setNewClassName("");
-                        setClassError("");
-                        if (!formState.classId) {
-                          setFormState((prev) => ({
-                            ...prev,
-                            classId: created.id,
-                          }));
-                        }
-                      } else {
-                        setClassError(
-                          "Kelas baru gagal ditambahkan. Coba lagi nanti."
-                        );
+                        return;
                       }
-                    } finally {
-                      setCreatingClass(false);
-                    }
-                  }}
-                  disabled={creatingClass || !newClassName.trim()}
-                  className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
-                >
-                  {creatingClass ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Menambah...
-                    </>
-                  ) : (
-                    "Tambah Kelas"
-                  )}
-                </button>
+                      setCreatingClass(true);
+                      try {
+                        const created = await addClass(trimmed);
+                        if (created) {
+                          setClassDrafts((prev) => ({
+                            ...prev,
+                            [created.id]: created.name,
+                          }));
+                          setNewClassName("");
+                          setClassError("");
+                          if (!formState.classId) {
+                            setFormState((prev) => ({
+                              ...prev,
+                              classId: created.id,
+                            }));
+                          }
+                        } else {
+                          setClassError(
+                            "Kelas baru gagal ditambahkan. Coba lagi nanti."
+                          );
+                        }
+                      } finally {
+                        setCreatingClass(false);
+                      }
+                    }}
+                    disabled={creatingClass || !newClassName.trim()}
+                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                  >
+                    {creatingClass ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Menambah...
+                      </>
+                    ) : (
+                      "Tambah Kelas"
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
 
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-widest text-slate-500">
@@ -882,8 +886,8 @@ export default function GuruSiswaPage() {
               Hapus Data Siswa?
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Data {confirmDelete.name} akan dihapus dari basis data. Tindakan ini
-              tidak dapat dibatalkan.
+              Data {confirmDelete.name} akan dihapus dari basis data. Tindakan
+              ini tidak dapat dibatalkan.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <button
@@ -952,9 +956,9 @@ function FaceEnrollmentModal({
   onSuccess,
 }: FaceEnrollmentModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
-    "idle"
-  );
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
   const [message, setMessage] = useState(
     "Pastikan wajah berada di tengah frame."
   );
@@ -1076,8 +1080,8 @@ function FaceEnrollmentModal({
             status === "success"
               ? "bg-emerald-50 text-emerald-600"
               : status === "error"
-                ? "bg-rose-50 text-rose-600"
-                : "bg-slate-50 text-slate-500"
+              ? "bg-rose-50 text-rose-600"
+              : "bg-slate-50 text-slate-500"
           )}
         >
           {message}
