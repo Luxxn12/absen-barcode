@@ -7,6 +7,7 @@ import { useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStudents } from "@/contexts/StudentContext";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const navItems = [
   { href: "/siswa", icon: Home, label: "Home" },
@@ -65,8 +66,8 @@ export default function SiswaLayout({
 
   return (
     <div className="relative flex min-h-screen flex-col bg-slate-100 pb-20 sm:pb-0">
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur sm:justify-between relative">
-        <div className="pr-20 sm:pr-0">
+      <header className="relative sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur sm:justify-between">
+        <div className="pr-24 sm:pr-0">
           <p className="text-xs uppercase tracking-widest text-indigo-500">
             Mode Siswa
           </p>
@@ -81,19 +82,22 @@ export default function SiswaLayout({
             </p>
           )}
         </div>
-        {session?.role === "siswa" && (
-          <button
-            type="button"
-            onClick={() => {
-              logout();
-              router.replace("/login");
-            }}
-            className="absolute right-4 top-1/2 inline-flex -translate-y-1/2 items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 sm:static sm:translate-y-0"
-          >
-            <LogOut className="h-4 w-4" />
-            Keluar
-          </button>
-        )}
+        <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-2 sm:static sm:translate-y-0">
+          <ThemeToggle size="sm" />
+          {session?.role === "siswa" && (
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                router.replace("/login");
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+            >
+              <LogOut className="h-4 w-4" />
+              Keluar
+            </button>
+          )}
+        </div>
       </header>
 
       <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>

@@ -16,6 +16,7 @@ import {
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const baseNavItems = [
   { href: "/guru/dashboard", label: "Dashboard", icon: Home },
@@ -206,7 +207,16 @@ export default function GuruLayout({
                 "Dashboard"}
             </h1>
           </div>
-          <div ref={profileRef} className="relative flex items-center gap-3">
+          <div
+            ref={profileRef}
+            className="relative flex items-center gap-2 md:gap-3"
+          >
+            <div className="hidden md:block">
+              <ThemeToggle />
+            </div>
+            <div className="md:hidden">
+              <ThemeToggle size="sm" />
+            </div>
             <div className="hidden flex-col text-right text-xs text-slate-500 sm:flex">
               <span className="font-medium text-slate-700">
                 {guruName}

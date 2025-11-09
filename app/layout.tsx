@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { StudentProvider } from "@/contexts/StudentContext";
 import { AttendanceProvider } from "@/contexts/AttendanceContext";
 import { AnnouncementProvider } from "@/contexts/AnnouncementContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,13 +33,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-100 text-slate-900 antialiased`}
       >
-        <StudentProvider>
-          <AttendanceProvider>
-            <AnnouncementProvider>
-              <AuthProvider>{children}</AuthProvider>
-            </AnnouncementProvider>
-          </AttendanceProvider>
-        </StudentProvider>
+        <ThemeProvider>
+          <StudentProvider>
+            <AttendanceProvider>
+              <AnnouncementProvider>
+                <AuthProvider>{children}</AuthProvider>
+              </AnnouncementProvider>
+            </AttendanceProvider>
+          </StudentProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,8 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --surface-soft: #e2e8f0;
+  --border: #e2e8f0;
+  --text-muted: #475569;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #020617;
+  --foreground: #f8fafc;
+  --surface: #0f172a;
+  --surface-muted: #111c2f;
+  --surface-soft: #0d1526;
+  --border: #1e2a3b;
+  --text-muted: #cbd5f5;
 }
 
 @theme inline {
@@ -12,15 +29,63 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+[data-theme="dark"] body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .bg-white\/80,
+:root[data-theme="dark"] .bg-white\/85,
+:root[data-theme="dark"] .bg-white\/90,
+:root[data-theme="dark"] .bg-white\/95 {
+  background-color: var(--surface) !important;
+  color: var(--foreground) !important;
+}
+
+:root[data-theme="dark"] .bg-slate-50 {
+  background-color: var(--surface-muted) !important;
+}
+
+:root[data-theme="dark"] .bg-slate-100,
+:root[data-theme="dark"] .bg-slate-200 {
+  background-color: var(--surface-soft) !important;
+}
+
+:root[data-theme="dark"] .border-slate-100,
+:root[data-theme="dark"] .border-slate-200,
+:root[data-theme="dark"] .border-slate-300 {
+  border-color: var(--border) !important;
+}
+
+:root[data-theme="dark"] .text-slate-900,
+:root[data-theme="dark"] .text-slate-800,
+:root[data-theme="dark"] .text-slate-700 {
+  color: var(--foreground) !important;
+}
+
+:root[data-theme="dark"] .text-slate-600,
+:root[data-theme="dark"] .text-slate-500,
+:root[data-theme="dark"] .text-slate-400 {
+  color: var(--text-muted) !important;
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  background-color: var(--surface) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+:root[data-theme="dark"] .shadow-slate-200\/40,
+:root[data-theme="dark"] .shadow-slate-200\/50 {
+  --tw-shadow-color: rgb(15 23 42 / 0.4);
 }

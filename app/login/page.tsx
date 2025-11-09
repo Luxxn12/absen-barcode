@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStudents } from "@/contexts/StudentContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type RoleTab = "guru" | "siswa";
 
@@ -55,7 +56,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 px-4 py-12">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 px-4 py-12">
+      <div className="fixed right-4 top-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-xl backdrop-blur">
         {!isReady && (
           <div className="mb-6 flex items-center justify-center rounded-2xl bg-slate-100 px-4 py-2 text-sm text-slate-500">

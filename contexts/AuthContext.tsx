@@ -43,6 +43,7 @@ type AuthContextValue = {
 const STORAGE_KEY = "absen-barcode-session";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 menit
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hydrated = useHydrated();
@@ -73,18 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const trimmedPassword = password.trim();
       if (!trimmedEmail || !trimmedPassword) {
         return false;
-      }
-
-      try {
-        await fetch("/api/auth/ensure-guru", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        }).catch(() => {
-          // ignore ensure error; login attempt will continue
-        });
-      } catch {
-        // ignore ensure failure
       }
 
       try {
@@ -146,6 +135,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     setSession(null);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated || !isClient || !session) {
+      return;
+    }
+
+    let timeoutId: number | null = null;
+    const clearTimer = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    const scheduleLogout = () => {
+      clearTimer();
+      timeoutId = window.setTimeout(() => {
+        logout();
+      }, INACTIVITY_TIMEOUT);
+    };
+
+    const handleActivity = () => {
+      if (document.hidden) return;
+      scheduleLogout();
+    };
+
+    const windowEvents: Array<keyof WindowEventMap> = [
+      "click",
+      "keydown",
+      "mousemove",
+      "scroll",
+      "touchstart",
+    ];
+
+    windowEvents.forEach((event) =>
+      window.addEventListener(event, handleActivity)
+    );
+    document.addEventListener("visibilitychange", handleActivity);
+    scheduleLogout();
+
+    return () => {
+      clearTimer();
+      windowEvents.forEach((event) =>
+        window.removeEventListener(event, handleActivity)
+      );
+      document.removeEventListener("visibilitychange", handleActivity);
+    };
+  }, [hydrated, isClient, session, logout]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
