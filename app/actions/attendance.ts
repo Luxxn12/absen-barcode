@@ -24,6 +24,12 @@ const ALLOWED_STATUSES: AttendanceStatus[] = [
   "Izin",
   "Alfa",
 ];
+const DEFAULT_TIME_ZONE =
+  process.env.APP_TIMEZONE ??
+  process.env.APP_TIME_ZONE ??
+  process.env.NEXT_PUBLIC_APP_TIMEZONE ??
+  process.env.NEXT_PUBLIC_APP_TIME_ZONE ??
+  "Asia/Jakarta";
 
 function assertValidStatus(status: string): asserts status is AttendanceStatus {
   if (!ALLOWED_STATUSES.includes(status as AttendanceStatus)) {
@@ -80,7 +86,33 @@ type UpsertPayload = {
   status: AttendanceStatus;
   checkIn: string;
   date?: string;
+  timeZone?: string;
 };
+
+function resolveDate(dateInput?: string, timeZone?: string) {
+  const trimmed = typeof dateInput === "string" ? dateInput.trim() : "";
+  if (trimmed) {
+    return trimmed;
+  }
+  const tz = (timeZone ?? "").trim() || DEFAULT_TIME_ZONE;
+  // Align default attendance date with the provided timezone so scans and admin view use the same day.
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  } catch (error) {
+    console.warn("[attendance][resolveDate]", "Invalid timezone:", tz, error);
+  }
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: DEFAULT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
 
 export async function upsertAttendanceAction(
   payload: UpsertPayload
@@ -92,10 +124,7 @@ export async function upsertAttendanceAction(
     typeof payload.status === "string" ? payload.status.trim() : "";
   const checkIn =
     typeof payload.checkIn === "string" ? payload.checkIn.trim() : "";
-  const date =
-    typeof payload.date === "string" && payload.date.trim().length
-      ? payload.date.trim()
-      : new Date().toISOString().split("T")[0];
+  const date = resolveDate(payload.date, payload.timeZone);
 
   if (!studentId || !checkIn) {
     throw new Error("Data kehadiran tidak lengkap.");

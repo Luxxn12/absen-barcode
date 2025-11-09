@@ -18,7 +18,8 @@
     "qrcode.react": "^4.2.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "react-qr-barcode-scanner": "^2.1.16"
+    "react-qr-barcode-scanner": "^2.1.16",
+    "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -26,6 +27,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/tz-lookup": "^6.1.2",
     "dotenv": "^16.4.5",
     "eslint": "^9",
     "eslint-config-next": "16.0.0",
