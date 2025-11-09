@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import tzLookup from "tz-lookup";
 import { useHydrated } from "@/hooks/useHydrated";
 import {
   listAttendanceAction,
@@ -24,11 +25,12 @@ type AttendanceContextValue = {
   records: AttendanceRecord[];
   hydrated: boolean;
   loading: boolean;
+  timeZone: string | null;
   updateAttendance: (
     studentId: string,
     status: AttendanceStatus,
     checkIn: string,
-    options?: { date?: string }
+    options?: { date?: string; timeZone?: string }
   ) => Promise<AttendanceRecord | null>;
   getRecordForStudent: (
     studentId: string,
@@ -62,6 +64,7 @@ export function AttendanceProvider({
   const hydrated = useHydrated();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeZone, setTimeZone] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -80,12 +83,59 @@ export function AttendanceProvider({
     void refresh();
   }, [hydrated, refresh]);
 
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") return;
+    let cancelled = false;
+
+    const applyBrowserTimeZone = () => {
+      if (cancelled) return;
+      const tz = getBrowserTimeZone();
+      setTimeZone(tz || null);
+    };
+
+    if (!("geolocation" in navigator)) {
+      applyBrowserTimeZone();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (cancelled) return;
+        try {
+          const detected = tzLookup(
+            position.coords.latitude,
+            position.coords.longitude
+          );
+          setTimeZone(detected || null);
+        } catch (error) {
+          console.error(
+            "Gagal menentukan zona waktu dari lokasi pengguna:",
+            error
+          );
+          applyBrowserTimeZone();
+        }
+      },
+      (error) => {
+        console.warn(
+          "Izin lokasi ditolak atau gagal. Menggunakan zona waktu perangkat.",
+          error
+        );
+        applyBrowserTimeZone();
+      },
+      { maximumAge: 60_000, timeout: 10_000 }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated]);
+
   const updateAttendance = useCallback(
     async (
       studentId: string,
       status: AttendanceStatus,
       checkIn: string,
-      options?: { date?: string }
+      options?: { date?: string; timeZone?: string }
     ) => {
       try {
         const record = await upsertAttendanceAction({
@@ -93,6 +143,7 @@ export function AttendanceProvider({
           status,
           checkIn,
           date: options?.date,
+          timeZone: options?.timeZone ?? timeZone ?? undefined,
         });
         setRecords((prev) => {
           const index = prev.findIndex(
@@ -112,7 +163,7 @@ export function AttendanceProvider({
         return null;
       }
     },
-    []
+    [timeZone]
   );
 
   const value = useMemo<AttendanceContextValue>(
@@ -120,6 +171,7 @@ export function AttendanceProvider({
       records,
       hydrated,
       loading,
+      timeZone,
       updateAttendance,
       getRecordForStudent: (studentId, date) =>
         records.find(
@@ -137,7 +189,7 @@ export function AttendanceProvider({
       },
       refresh,
     }),
-    [records, hydrated, loading, updateAttendance, refresh]
+    [records, hydrated, loading, timeZone, updateAttendance, refresh]
   );
 
   return (
@@ -153,4 +205,16 @@ export function useAttendance() {
     throw new Error("useAttendance must be used within AttendanceProvider");
   }
   return context;
+}
+
+function getBrowserTimeZone() {
+  if (typeof Intl === "undefined") {
+    return "";
+  }
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  } catch (error) {
+    console.warn("Gagal membaca zona waktu perangkat:", error);
+    return "";
+  }
 }
